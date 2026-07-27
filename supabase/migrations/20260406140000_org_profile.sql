@@ -1,0 +1,3 @@
+ALTER TABLE organizations
+ADD COLUMN IF NOT EXISTS host_photo TEXT,
+ADD COLUMN IF NOT EXISTS description TEXT;
