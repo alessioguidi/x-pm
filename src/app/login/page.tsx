@@ -4,7 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Map, Loader2 } from "lucide-react";
+import { Map, Loader2, Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function LoginPage() {
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -50,7 +51,7 @@ export default function LoginPage() {
           <Link href="/" className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4 hover:bg-white/30 transition">
             <Map className="w-8 h-8 text-white" />
           </Link>
-          <h2 className="text-2xl font-bold font-serif mb-1">PMS Marketplace</h2>
+          <h2 className="text-2xl font-bold font-serif mb-1">X-PM property manager</h2>
           <p className="text-rose-100 text-sm">
             {isRegistering ? "Unisciti alla nostra piattaforma" : "Bentornato! Effettua l'accesso per continuare"}
           </p>
@@ -72,14 +73,24 @@ export default function LoginPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full border-gray-300 border px-4 py-3 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full border-gray-300 border px-4 py-3 pr-12 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition p-1"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             <button 
