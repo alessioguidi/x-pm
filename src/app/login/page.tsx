@@ -51,7 +51,7 @@ export default function LoginPage() {
           <Link href="/" className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4 hover:bg-white/30 transition">
             <Map className="w-8 h-8 text-white" />
           </Link>
-          <h2 className="text-2xl font-bold font-serif mb-1">X-PM property manager</h2>
+          <h2 className="text-2xl font-bold font-serif mb-1">X-PM Property Manager</h2>
           <p className="text-rose-100 text-sm">
             {isRegistering ? "Unisciti alla nostra piattaforma" : "Bentornato! Effettua l'accesso per continuare"}
           </p>

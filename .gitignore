@@ -33,6 +33,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 netlify-import.env
+deploy.ps1
 
 # vercel
 .vercel
