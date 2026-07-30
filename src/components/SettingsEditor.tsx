@@ -62,6 +62,10 @@ export default function SettingsEditor({ organization }: { organization: any }) 
     number_format: organization.number_format || "it-IT",
     date_format: organization.date_format || "DD/MM/YYYY",
     currency: organization.currency || "EUR",
+    page_about: organization.page_about || "",
+    page_terms: organization.page_terms || "",
+    page_contacts: organization.page_contacts || "",
+    whatsapp_phone: organization.whatsapp_phone || "",
   });
 
   const handleSave = async () => {
@@ -84,7 +88,11 @@ export default function SettingsEditor({ organization }: { organization: any }) 
         number_format: formData.number_format,
         date_format: formData.date_format,
         currency: formData.currency,
-        cover_photos: formData.cover_photos
+        cover_photos: formData.cover_photos,
+        page_about: formData.page_about,
+        page_terms: formData.page_terms,
+        page_contacts: formData.page_contacts,
+        whatsapp_phone: formData.whatsapp_phone,
       })
       .eq('id', organization.id);
     
@@ -663,6 +671,40 @@ export default function SettingsEditor({ organization }: { organization: any }) 
                   Disconnetti
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+
+        <hr className="border-gray-100" />
+
+        {/* Pagine Vetrina */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 flex items-center mb-4">
+            <AlignLeft className="w-5 h-5 mr-2 text-purple-600"/>
+            Pagine Vetrina Pubbliche
+          </h3>
+          <div className="space-y-4 bg-purple-50 p-6 rounded-xl border border-purple-100">
+            <p className="text-sm text-purple-700 mb-4">Scrivi il contenuto delle pagine informative accessibili dal footer della vetrina pubblica.</p>
+
+            <div>
+              <label className="block text-xs uppercase font-bold text-gray-700 mb-2">Chi Siamo</label>
+              <textarea className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 h-28 outline-none" placeholder="Scrivi la storia della tua attività..." value={formData.page_about} onChange={e => setFormData({...formData, page_about: e.target.value})} />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase font-bold text-gray-700 mb-2">Termini e Condizioni</label>
+              <textarea className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 h-28 outline-none" placeholder="Scrivi i termini e condizioni..." value={formData.page_terms} onChange={e => setFormData({...formData, page_terms: e.target.value})} />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase font-bold text-gray-700 mb-2">Contatti (testo libero, es. orari, indirizzo)</label>
+              <textarea className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 h-28 outline-none" placeholder="Scrivi le informazioni di contatto..." value={formData.page_contacts} onChange={e => setFormData({...formData, page_contacts: e.target.value})} />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase font-bold text-gray-700 mb-2">Numero WhatsApp (per link diretto nel footer)</label>
+              <input type="text" placeholder="es. 393331234567" className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.whatsapp_phone} onChange={e => setFormData({...formData, whatsapp_phone: e.target.value})} />
+              <p className="text-xs text-gray-500 mt-1">Inserisci il numero senza + e senza spazi. Apparirà l'icona WhatsApp nel footer della vetrina.</p>
             </div>
           </div>
         </div>

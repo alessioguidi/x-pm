@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import WhatsAppButton from "@/components/public/WhatsAppButton";
 
 export default async function OrganizationPublicLayout({ children, params }: { children: ReactNode, params: Promise<{ org_slug: string }> }) {
   const resolvedParams = await params;
@@ -45,13 +46,12 @@ export default async function OrganizationPublicLayout({ children, params }: { c
             <Link href={`/b/${resolvedParams.org_slug}`} className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
               Le Nostre Strutture
             </Link>
-            <a 
-              href="#contatti" 
-              className="text-sm font-medium text-white px-6 py-2.5 rounded-full shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5" 
-              style={{ backgroundColor: 'var(--theme-color)'}}
-            >
-              Contatti
-            </a>
+            <Link href={`/b/${resolvedParams.org_slug}/contact`} 
+               className="text-sm font-medium text-white px-6 py-2.5 rounded-full shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5" 
+               style={{ backgroundColor: 'var(--theme-color)'}}
+             >
+               Contatti
+             </Link>
           </nav>
         </div>
       </header>
@@ -60,7 +60,7 @@ export default async function OrganizationPublicLayout({ children, params }: { c
         {children}
       </main>
       
-      <footer className="bg-gray-950 text-gray-400 py-16 mt-16" id="contatti">
+      <footer className="bg-gray-950 text-gray-400 py-16 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-12 text-sm text-center md:text-left">
           <div className="space-y-4">
              <h3 className="text-white text-lg font-semibold">{org.name}</h3>
@@ -70,18 +70,24 @@ export default async function OrganizationPublicLayout({ children, params }: { c
              <h3 className="text-white text-lg font-semibold">Scopri</h3>
              <ul className="space-y-2 opacity-80">
                <li><Link href={`/b/${resolvedParams.org_slug}`} className="hover:text-white transition-colors">Strutture</Link></li>
-               <li><a href="#" className="hover:text-white transition-colors">Chi Siamo</a></li>
-               <li><a href="#" className="hover:text-white transition-colors">Termini e Condizioni</a></li>
+               {org.page_about && <li><Link href={`/b/${resolvedParams.org_slug}/about`} className="hover:text-white transition-colors">Chi Siamo</Link></li>}
+               {org.page_terms && <li><Link href={`/b/${resolvedParams.org_slug}/terms`} className="hover:text-white transition-colors">Termini e Condizioni</Link></li>}
+               {org.page_contacts && <li><Link href={`/b/${resolvedParams.org_slug}/contact`} className="hover:text-white transition-colors">Contatti</Link></li>}
              </ul>
           </div>
           <div className="space-y-4">
              <h3 className="text-white text-lg font-semibold">Contatti</h3>
              <p className="opacity-80">Hai bisogno di assistenza per una prenotazione? Siamo a tua disposizione.</p>
-             <button 
-               className="mt-2 text-white border border-gray-700 px-4 py-2 rounded-lg hover:border-gray-500 transition-colors"
-             >
-               Invia Messaggio
-             </button>
+             <div className="flex flex-wrap gap-3">
+               {org.smtp_from_email && (
+                 <a href={`mailto:${org.smtp_from_email}`} className="inline-flex items-center gap-2 text-white border border-gray-700 px-4 py-2 rounded-lg hover:border-gray-500 transition-colors text-sm">
+                   Invia Messaggio
+                 </a>
+               )}
+               {org.whatsapp_phone && (
+                 <WhatsAppButton phone={org.whatsapp_phone} orgName={org.name} />
+               )}
+             </div>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 border-t border-gray-800 mt-12 pt-8 text-center text-xs opacity-60">
