@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/utils/supabase/client";
 import { ChevronLeft, ChevronRight, Loader2, CalendarDays, X, Save, MousePointerClick, Layers } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, parseISO, differenceInDays } from "date-fns";
 import { it } from "date-fns/locale";
 import toast from "react-hot-toast";
 import Link from "next/link";
@@ -12,7 +12,10 @@ import Link from "next/link";
 export default function CalendarGridPage() {
   const router = useRouter();
   const [properties, setProperties] = useState<any[]>([]);
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("lastCalendarPropertyId") || "";
+    return "";
+  });
   const [currentProperty, setCurrentProperty] = useState<any>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -27,9 +30,9 @@ export default function CalendarGridPage() {
   const [sidePrice, setSidePrice] = useState("");
   const [sideMinStay, setSideMinStay] = useState("");
   const [sideMaxStay, setSideMaxStay] = useState("");
-  const [sideBlocked, setSideBlocked] = useState(false);
-  const [sideNoIn, setSideNoIn] = useState(false);
-  const [sideNoOut, setSideNoOut] = useState(false);
+  const [sideBlocked, setSideBlocked] = useState<boolean | null>(null);
+  const [sideNoIn, setSideNoIn] = useState<boolean | null>(null);
+  const [sideNoOut, setSideNoOut] = useState<boolean | null>(null);
   const [savingSide, setSavingSide] = useState(false);
 
   const [showDeals, setShowDeals] = useState(false);
@@ -47,7 +50,12 @@ export default function CalendarGridPage() {
       const { data } = await supabase.from("properties").select("id, name, base_price_per_night, max_guests").order("name");
       if (data && data.length > 0) {
         setProperties(data);
-        setSelectedPropertyId(data[0].id);
+        const saved = localStorage.getItem("lastCalendarPropertyId");
+        if (saved && data.some(p => p.id === saved)) {
+          setSelectedPropertyId(saved);
+        } else {
+          setSelectedPropertyId(data[0].id);
+        }
       }
     }
     fetchProperties();
@@ -94,6 +102,11 @@ export default function CalendarGridPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPropertyId, currentDate, showDeals]);
 
+  // Persisti ultimo immobile selezionato
+  useEffect(() => {
+    if (selectedPropertyId) localStorage.setItem("lastCalendarPropertyId", selectedPropertyId);
+  }, [selectedPropertyId]);
+
   const nextMonth = () => {
     setCurrentDate(addMonths(currentDate, 1));
     setSelectedDates([]);
@@ -135,7 +148,7 @@ export default function CalendarGridPage() {
     }
   };
 
-  // Compiliamo i campi se ce n'è SOLO UNA di data selezionata, altrimenti puliamo i campi per modifica bulk
+  // Compiliamo i campi se ce n'è SOLO UNA di data selezionata, altrimenti campi neutri per modifica bulk
   useEffect(() => {
     if (selectedDates.length === 1) {
       const day = selectedDates[0];
@@ -144,27 +157,26 @@ export default function CalendarGridPage() {
         setSidePrice(ovr.price_override !== null && ovr.price_override !== undefined ? String(ovr.price_override) : "");
         setSideMinStay(ovr.min_stay !== null && ovr.min_stay !== undefined ? String(ovr.min_stay) : "");
         setSideMaxStay(ovr.max_stay !== null && ovr.max_stay !== undefined ? String(ovr.max_stay) : "");
-        setSideBlocked(!!ovr.is_blocked);
-        setSideNoIn(!!ovr.closed_to_arrival);
-        setSideNoOut(!!ovr.closed_to_departure);
+        setSideBlocked(ovr.is_blocked ?? null);
+        setSideNoIn(ovr.closed_to_arrival ?? null);
+        setSideNoOut(ovr.closed_to_departure ?? null);
       } else {
         // Default property params
         setSidePrice("");
         setSideMinStay("");
         setSideMaxStay("");
-        setSideBlocked(false);
-        setSideNoIn(false);
-        setSideNoOut(false);
+        setSideBlocked(null);
+        setSideNoIn(null);
+        setSideNoOut(null);
       }
     } else if (selectedDates.length > 1) {
-      // In selezione multipla si parte da vuoto 
-      // (in modo da impattare tutto il blocco con il nuovo inserimento)
+      // Multipla: tutti neutri — solo i campi compilati verranno applicati
       setSidePrice("");
       setSideMinStay("");
       setSideMaxStay("");
-      setSideBlocked(false);
-      setSideNoIn(false);
-      setSideNoOut(false);
+      setSideBlocked(null);
+      setSideNoIn(null);
+      setSideNoOut(null);
     }
   }, [selectedDates, overrides]);
 
@@ -174,16 +186,20 @@ export default function CalendarGridPage() {
     setSavingSide(true);
     try {
       // Prepara l'array di oggetti UPSERT per tutti i giorni
-      const updates = selectedDates.map(day => ({
-        property_id: selectedPropertyId,
-        date: format(day, "yyyy-MM-dd"), // Forziamo formato
-        is_blocked: sideBlocked,
-        closed_to_arrival: sideNoIn,
-        closed_to_departure: sideNoOut,
-        price_override: sidePrice !== "" ? Number(sidePrice) : null,
-        min_stay: sideMinStay !== "" ? Number(sideMinStay) : null,
-        max_stay: sideMaxStay !== "" ? Number(sideMaxStay) : null
-      }));
+      const updates = selectedDates.map(day => {
+        const record: Record<string, unknown> = {
+          property_id: selectedPropertyId,
+          date: format(day, "yyyy-MM-dd"),
+        };
+        // Solo i campi compilati (non null/empty) vengono applicati
+        if (sideBlocked !== null) record.is_blocked = sideBlocked;
+        if (sideNoIn !== null) record.closed_to_arrival = sideNoIn;
+        if (sideNoOut !== null) record.closed_to_departure = sideNoOut;
+        if (sidePrice !== "") record.price_override = Number(sidePrice);
+        if (sideMinStay !== "") record.min_stay = Number(sideMinStay);
+        if (sideMaxStay !== "") record.max_stay = Number(sideMaxStay);
+        return record;
+      });
 
       const { error } = await supabase.from('calendar_overrides').upsert(updates, { onConflict: 'property_id, date' });
       if (error) throw error;
@@ -209,6 +225,8 @@ export default function CalendarGridPage() {
       return day >= chin && day < chout;
     });
   };
+
+  const sortedDates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
 
   return (
     <div className="space-y-6 flex flex-col h-[calc(100vh-6rem)]">
@@ -372,7 +390,7 @@ export default function CalendarGridPage() {
                                 label = 'Trattativa';
                             }
 
-                            return (
+  return (
                               <span className={`inline-flex flex-col w-[68px] overflow-hidden items-center justify-center p-1 text-[9px] uppercase tracking-wider font-bold rounded-lg shrink-0 border ${colorClass}`}>
                                 <span className="truncate w-full text-center">{label}</span>
                                 <span className="truncate w-full text-center opacity-80">{booking.guest_name}</span>
@@ -431,21 +449,54 @@ export default function CalendarGridPage() {
         {/* Sidebar Impostazioni Giorno/Gruppo Singolo */}
         {selectedDates.length > 0 && (
           <div className="w-full md:w-[320px] md:shrink-0 bg-white border border-gray-200 rounded-xl shadow-lg flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
-            <div className={`flex items-center justify-between px-5 py-4 border-b border-gray-100 ${selectedDates.length > 1 ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white' : 'bg-gradient-to-r from-blue-50 to-white'}`}>
-              <div>
+            <div className={`px-5 py-4 border-b border-gray-100 ${selectedDates.length > 1 ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white' : 'bg-gradient-to-r from-blue-50 to-white'}`}>
+              <div className="flex items-center justify-between">
                 <h3 className={`font-bold ${selectedDates.length > 1 ? 'text-white' : 'text-gray-900'} flex items-center`}>
-                  {selectedDates.length > 1 && <MousePointerClick className="w-4 h-4 mr-2" />}
+                  {selectedDates.length > 1 && <MousePointerClick className="w-4 h-4 mr-2 shrink-0" />}
                   {selectedDates.length > 1 ? "Modifica Massiva" : "Modifica Data"}
                 </h3>
-                <p className={`text-sm font-medium ${selectedDates.length > 1 ? 'text-blue-100' : 'text-blue-600'} capitalize mt-0.5`}>
-                  {selectedDates.length === 1 
-                    ? format(selectedDates[0], "EEEE d MMMM yyyy", { locale: it }) 
-                    : `${selectedDates.length} giorni selezionati`}
-                </p>
+                <button onClick={() => setSelectedDates([])} className={`p-1.5 rounded-full transition shrink-0 ${selectedDates.length > 1 ? 'text-blue-100 hover:text-white hover:bg-blue-600' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'}`}>
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button onClick={() => setSelectedDates([])} className={`p-1.5 rounded-full transition ${selectedDates.length > 1 ? 'text-blue-100 hover:text-white hover:bg-blue-600' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'}`}>
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {selectedDates.length >= 1 && (
+                  <>
+                    <input
+                      type="date"
+                      value={format(sortedDates[0], "yyyy-MM-dd")}
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        const newStart = parseISO(e.target.value);
+                        const oldEnd = sortedDates[sortedDates.length - 1];
+                        const from = newStart <= oldEnd ? newStart : oldEnd;
+                        const to = newStart <= oldEnd ? oldEnd : newStart;
+                        if (differenceInDays(to, from) > 366) { toast.error("Intervallo massimo 366 giorni"); return; }
+                        const days = eachDayOfInterval({ start: from, end: to });
+                        setSelectedDates(days);
+                      }}
+                      className={`text-xs font-bold rounded px-2 py-1 w-[110px] border ${selectedDates.length > 1 ? 'bg-blue-700/30 text-white border-blue-400/50' : 'bg-white text-gray-700 border-gray-300'}`}
+                    />
+                    <span className={`text-xs font-bold ${selectedDates.length > 1 ? 'text-blue-200' : 'text-gray-400'}`}>→</span>
+                    <input
+                      type="date"
+                      value={format(sortedDates[sortedDates.length - 1], "yyyy-MM-dd")}
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        const newEnd = parseISO(e.target.value);
+                        const oldStart = sortedDates[0];
+                        const from = oldStart <= newEnd ? oldStart : newEnd;
+                        const to = oldStart <= newEnd ? newEnd : oldStart;
+                        if (differenceInDays(to, from) > 366) { toast.error("Intervallo massimo 366 giorni"); return; }
+                        const days = eachDayOfInterval({ start: from, end: to });
+                        setSelectedDates(days);
+                      }}
+                      className={`text-xs font-bold rounded px-2 py-1 w-[110px] border ${selectedDates.length > 1 ? 'bg-blue-700/30 text-white border-blue-400/50' : 'bg-white text-gray-700 border-gray-300'}`}
+                    />
+                    <span className={`text-xs font-medium shrink-0 ${selectedDates.length > 1 ? 'text-blue-200' : 'text-gray-400'}`}>({selectedDates.length})</span>
+                  </>
+                )}
+              </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
@@ -455,18 +506,21 @@ export default function CalendarGridPage() {
                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 block">Disponibilità In Blocco</label>
                 <div className="flex gap-2">
                   <button 
-                    onClick={() => setSideBlocked(false)}
-                    className={`flex-1 py-2 text-sm font-bold border rounded-lg transition-colors ${!sideBlocked ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                    onClick={() => setSideBlocked(sideBlocked === false ? null : false)}
+                    className={`flex-1 py-2 text-sm font-bold border rounded-lg transition-colors ${sideBlocked === false ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500' : sideBlocked === true ? 'bg-white border-gray-200 text-gray-400' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
                   >
+                    {sideBlocked === null && <span className="inline-block mr-1 text-gray-400">—</span>}
                     Disponibile
                   </button>
                   <button 
-                    onClick={() => setSideBlocked(true)}
-                    className={`flex-1 py-2 text-sm font-bold border rounded-lg transition-colors ${sideBlocked ? 'bg-red-50 border-red-500 text-red-700 ring-1 ring-red-500' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                    onClick={() => setSideBlocked(sideBlocked === true ? null : true)}
+                    className={`flex-1 py-2 text-sm font-bold border rounded-lg transition-colors ${sideBlocked === true ? 'bg-red-50 border-red-500 text-red-700 ring-1 ring-red-500' : sideBlocked === false ? 'bg-white border-gray-200 text-gray-400' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
                   >
+                    {sideBlocked === null && <span className="inline-block mr-1 text-gray-400">—</span>}
                     Bloccato
                   </button>
                 </div>
+                {sideBlocked === null && <p className="text-[11px] text-gray-400 mt-1">Nessuna modifica (click per impostare)</p>}
               </div>
 
               <div className="h-px bg-gray-100 w-full" />
@@ -514,14 +568,32 @@ export default function CalendarGridPage() {
                 </div>
 
                 <div className="space-y-3 mt-4">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" checked={sideNoIn} onChange={e => setSideNoIn(e.target.checked)} className="w-4 h-4 text-blue-600 rounded border-gray-300" />
-                    <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Chiuso all'Arrivo</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" checked={sideNoOut} onChange={e => setSideNoOut(e.target.checked)} className="w-4 h-4 text-blue-600 rounded border-gray-300" />
-                    <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Chiuso alla Partenza</span>
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSideNoIn(sideNoIn === true ? null : sideNoIn === false ? true : false)}
+                      className={`h-5 w-5 flex items-center justify-center border-2 rounded transition-colors shrink-0 ${sideNoIn === true ? 'bg-blue-600 border-blue-600 text-white' : sideNoIn === false ? 'bg-red-100 border-red-400 text-red-600' : 'border-gray-300 bg-white text-gray-400'}`}
+                    >
+                      {sideNoIn === true && <span className="text-xs font-bold">✓</span>}
+                      {sideNoIn === false && <span className="text-xs font-bold">✕</span>}
+                      {sideNoIn === null && <span className="text-xs">—</span>}
+                    </button>
+                    <span className="text-sm font-medium text-gray-700">Chiuso all'Arrivo</span>
+                    {sideNoIn === null && <span className="text-[10px] text-gray-400">nessuna modifica</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSideNoOut(sideNoOut === true ? null : sideNoOut === false ? true : false)}
+                      className={`h-5 w-5 flex items-center justify-center border-2 rounded transition-colors shrink-0 ${sideNoOut === true ? 'bg-blue-600 border-blue-600 text-white' : sideNoOut === false ? 'bg-red-100 border-red-400 text-red-600' : 'border-gray-300 bg-white text-gray-400'}`}
+                    >
+                      {sideNoOut === true && <span className="text-xs font-bold">✓</span>}
+                      {sideNoOut === false && <span className="text-xs font-bold">✕</span>}
+                      {sideNoOut === null && <span className="text-xs">—</span>}
+                    </button>
+                    <span className="text-sm font-medium text-gray-700">Chiuso alla Partenza</span>
+                    {sideNoOut === null && <span className="text-[10px] text-gray-400">nessuna modifica</span>}
+                  </div>
                 </div>
               </div>
 

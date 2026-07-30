@@ -24,9 +24,9 @@ function BulkCalendarUpdateContent() {
   const [priceOverride, setPriceOverride] = useState("");
   const [minStay, setMinStay] = useState("");
   const [maxStay, setMaxStay] = useState("");
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [closedToArrival, setClosedToArrival] = useState(false);
-  const [closedToDeparture, setClosedToDeparture] = useState(false);
+  const [isBlocked, setIsBlocked] = useState<boolean | null>(null);
+  const [closedToArrival, setClosedToArrival] = useState<boolean | null>(null);
+  const [closedToDeparture, setClosedToDeparture] = useState<boolean | null>(null);
   // Giorni della settimana selezionati (0 = Dom, 1 = Lun, ..., 6 = Sab)
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5, 6, 0]);
 
@@ -72,13 +72,12 @@ function BulkCalendarUpdateContent() {
         .map(day => {
         const updateObject: any = {
           property_id: propertyId,
-          date: format(day, "yyyy-MM-dd"), // yyyy-MM-dd
-          is_blocked: isBlocked,
-          closed_to_arrival: closedToArrival,
-          closed_to_departure: closedToDeparture
+          date: format(day, "yyyy-MM-dd"),
         };
         
-        // Aggiungi solo i campi numerici se l'utente li ha compilati
+        if (isBlocked !== null) updateObject.is_blocked = isBlocked;
+        if (closedToArrival !== null) updateObject.closed_to_arrival = closedToArrival;
+        if (closedToDeparture !== null) updateObject.closed_to_departure = closedToDeparture;
         if (priceOverride !== "") updateObject.price_override = Number(priceOverride);
         if (minStay !== "") updateObject.min_stay = Number(minStay);
         if (maxStay !== "") updateObject.max_stay = Number(maxStay);
@@ -100,13 +99,12 @@ function BulkCalendarUpdateContent() {
       if (error) throw error;
       
       setSuccess(true);
-      // Reset dei campi numerici dopo il successo
       setPriceOverride("");
       setMinStay("");
       setMaxStay("");
-      setIsBlocked(false);
-      setClosedToArrival(false);
-      setClosedToDeparture(false);
+      setIsBlocked(null);
+      setClosedToArrival(null);
+      setClosedToDeparture(null);
 
     } catch (err) {
       console.error(err);
@@ -224,42 +222,51 @@ function BulkCalendarUpdateContent() {
 
           <div className="space-y-4">
             <div className="flex items-center">
-              <input 
-                type="checkbox" 
-                id="blocked"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                checked={isBlocked}
-                onChange={e => setIsBlocked(e.target.checked)}
-              />
-              <label htmlFor="blocked" className="ml-2 block text-sm text-gray-900 font-medium">
+              <button
+                type="button"
+                onClick={() => setIsBlocked(isBlocked === true ? null : isBlocked === false ? true : false)}
+                className={`h-5 w-5 flex items-center justify-center border-2 rounded transition-colors ${isBlocked === true ? 'bg-blue-600 border-blue-600 text-white' : isBlocked === false ? 'bg-red-100 border-red-400 text-red-600' : 'border-gray-300 bg-white text-gray-400'}`}
+              >
+                {isBlocked === true && <span className="text-xs font-bold">✓</span>}
+                {isBlocked === false && <span className="text-xs font-bold">✕</span>}
+                {isBlocked === null && <span className="text-xs">—</span>}
+              </button>
+              <label onClick={() => setIsBlocked(isBlocked === true ? null : isBlocked === false ? true : false)} className="ml-2 block text-sm text-gray-900 font-medium cursor-pointer">
                 Chiuso per Vendita (Blocca intero calendario per queste date)
               </label>
+              {isBlocked === null && <span className="ml-2 text-[10px] text-gray-400">nessuna modifica</span>}
             </div>
             
             <div className="flex items-center">
-              <input 
-                type="checkbox" 
-                id="closedToArrival"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                checked={closedToArrival}
-                onChange={e => setClosedToArrival(e.target.checked)}
-              />
-              <label htmlFor="closedToArrival" className="ml-2 block text-sm text-gray-900">
+              <button
+                type="button"
+                onClick={() => setClosedToArrival(closedToArrival === true ? null : closedToArrival === false ? true : false)}
+                className={`h-5 w-5 flex items-center justify-center border-2 rounded transition-colors ${closedToArrival === true ? 'bg-blue-600 border-blue-600 text-white' : closedToArrival === false ? 'bg-red-100 border-red-400 text-red-600' : 'border-gray-300 bg-white text-gray-400'}`}
+              >
+                {closedToArrival === true && <span className="text-xs font-bold">✓</span>}
+                {closedToArrival === false && <span className="text-xs font-bold">✕</span>}
+                {closedToArrival === null && <span className="text-xs">—</span>}
+              </button>
+              <label onClick={() => setClosedToArrival(closedToArrival === true ? null : closedToArrival === false ? true : false)} className="ml-2 block text-sm text-gray-900 cursor-pointer">
                 Chiuso all'Arrivo <span className="text-gray-500 font-normal">(Non si può effettuare Check-in in queste date)</span>
               </label>
+              {closedToArrival === null && <span className="ml-2 text-[10px] text-gray-400">nessuna modifica</span>}
             </div>
 
             <div className="flex items-center">
-              <input 
-                type="checkbox" 
-                id="closedToDeparture"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                checked={closedToDeparture}
-                onChange={e => setClosedToDeparture(e.target.checked)}
-              />
-              <label htmlFor="closedToDeparture" className="ml-2 block text-sm text-gray-900">
+              <button
+                type="button"
+                onClick={() => setClosedToDeparture(closedToDeparture === true ? null : closedToDeparture === false ? true : false)}
+                className={`h-5 w-5 flex items-center justify-center border-2 rounded transition-colors ${closedToDeparture === true ? 'bg-blue-600 border-blue-600 text-white' : closedToDeparture === false ? 'bg-red-100 border-red-400 text-red-600' : 'border-gray-300 bg-white text-gray-400'}`}
+              >
+                {closedToDeparture === true && <span className="text-xs font-bold">✓</span>}
+                {closedToDeparture === false && <span className="text-xs font-bold">✕</span>}
+                {closedToDeparture === null && <span className="text-xs">—</span>}
+              </button>
+              <label onClick={() => setClosedToDeparture(closedToDeparture === true ? null : closedToDeparture === false ? true : false)} className="ml-2 block text-sm text-gray-900 cursor-pointer">
                 Chiuso alla Partenza <span className="text-gray-500 font-normal">(Non si può effettuare Check-out in queste date)</span>
               </label>
+              {closedToDeparture === null && <span className="ml-2 text-[10px] text-gray-400">nessuna modifica</span>}
             </div>
           </div>
 
