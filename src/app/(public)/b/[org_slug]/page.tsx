@@ -14,13 +14,16 @@ export default async function PublicOrganizationPage({ params }: { params: Promi
 
   // Omette le strutture nascoste is_active = false
   const { data: properties } = await supabase.from('properties')
-    .select('*, property_photos(image_url)')
+    .select('*, property_photos(image_url, display_order)')
     .eq('organization_id', org.id)
     .eq('is_active', true)
-    .order('created_at', { referencedTable: 'property_photos', ascending: true });
+    .order('display_order', { referencedTable: 'property_photos', ascending: true, nullsFirst: false });
 
   const today = new Date().toISOString().split('T')[0];
   const propertyIds = properties?.map(p => p.id) || [];
+  
+  // Copertina: prima foto disponibile tra tutte le proprietà
+  const coverPhoto = properties?.reduce<string | null>((found, p) => found || p.property_photos?.[0]?.image_url || null, null);
   
   let minimumPrices: Record<string, number> = {};
   if (propertyIds.length > 0) {
@@ -46,9 +49,9 @@ export default async function PublicOrganizationPage({ params }: { params: Promi
       {/* Hero Section */}
       <div className="relative h-[450px] w-full flex items-center justify-center overflow-hidden bg-gray-900 border-b border-gray-200">
         <div className="absolute inset-0 opacity-50 mix-blend-multiply" style={{ backgroundColor: org.theme_color || '#2563eb' }} />
-        {properties && properties[0]?.property_photos?.[0]?.image_url && (
+        {coverPhoto && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={properties[0].property_photos[0].image_url} alt="Cover" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+          <img src={coverPhoto} alt="Cover" className="absolute inset-0 w-full h-full object-cover opacity-50" />
         )}
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto mt-10">
           <h1 className="text-5xl md:text-7xl font-extrabold text-white tracking-tight drop-shadow-xl mb-6">
@@ -96,7 +99,7 @@ export default async function PublicOrganizationPage({ params }: { params: Promi
                   </div>
                   
                   <div className="p-8 flex flex-col flex-grow">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-[var(--theme-color)] transition-colors line-clamp-1">{p.name}</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-[var(--theme-color)] transition-colors">{p.name}</h3>
                     <div className="flex items-center text-sm text-gray-500 mb-6 font-medium">
                       <MapPin className="w-4 h-4 mr-1.5 opacity-70" /> {p.city}
                     </div>
