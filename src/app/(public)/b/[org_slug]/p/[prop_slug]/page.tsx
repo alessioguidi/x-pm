@@ -4,8 +4,38 @@ import { MapPin, Users, Bed, Bath, CheckSquare, ShieldCheck, AlertCircle, Clock 
 import Link from "next/link";
 import LightboxGallery from "@/components/public/LightboxGallery";
 import BookingWidget from "@/components/public/BookingWidget";
+import type { Metadata } from "next";
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ org_slug: string, prop_slug: string }> }): Promise<Metadata> {
+  const { org_slug, prop_slug } = await params;
+  const { data: property } = await supabase
+    .from('properties')
+    .select('name, city, property_photos(image_url, display_order), organizations!inner(name)')
+    .eq('slug', prop_slug)
+    .eq('organizations.slug', org_slug)
+    .order('display_order', { referencedTable: 'property_photos', ascending: true, nullsFirst: false })
+    .single();
+  if (!property) return { title: "Property Manager" };
+  const orgName = Array.isArray(property.organizations) ? property.organizations[0]?.name : (property.organizations as any)?.name;
+  const ogImage = property.property_photos?.[0]?.image_url || "/icons/icon.svg";
+  return {
+    title: `${property.name} — ${orgName}`,
+    description: `${property.name} a ${property.city || "località"}`,
+    openGraph: {
+      title: property.name,
+      description: `${property.name} a ${property.city || "località"} — ${orgName}`,
+      images: [{ url: ogImage, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: property.name,
+      description: `${property.name} a ${property.city || "località"}`,
+      images: [ogImage],
+    },
+  };
+}
 
 export default async function PropertyDetailPage({ params }: { params: Promise<{ org_slug: string, prop_slug: string }> }) {
   const resolvedParams = await params;

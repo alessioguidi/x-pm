@@ -3,8 +3,31 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MapPin, Users, Bed, ChevronRight } from "lucide-react";
 import CoverCarousel from "@/components/public/CoverCarousel";
+import type { Metadata } from "next";
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ org_slug: string }> }): Promise<Metadata> {
+  const { org_slug } = await params;
+  const { data: org } = await supabase.from('organizations').select('name, description, host_photo, logo_url, cover_photos').eq('slug', org_slug).single();
+  if (!org) return { title: "Property Manager" };
+  const ogImage = org.host_photo || org.logo_url || org.cover_photos?.[0] || "/icons/icon.svg";
+  return {
+    title: org.name,
+    description: org.description || `Benvenuti da ${org.name} — Esplora le nostre proprietà`,
+    openGraph: {
+      title: org.name,
+      description: org.description || `Benvenuti da ${org.name}`,
+      images: [{ url: ogImage, width: 512, height: 512 }],
+    },
+    twitter: {
+      card: "summary",
+      title: org.name,
+      description: org.description || `Benvenuti da ${org.name}`,
+      images: [ogImage],
+    },
+  };
+}
 
 export default async function PublicOrganizationPage({ params }: { params: Promise<{ org_slug: string }> }) {
   const resolvedParams = await params;
