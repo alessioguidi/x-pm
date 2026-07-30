@@ -53,9 +53,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   if (!property) notFound();
 
   const photos = (property.property_photos || []);
-  
-  const mainPhoto = photos.length > 0 ? photos[0].image_url : "https://placehold.co/1200x800?text=Nessuna+Foto";
-  const extraPhotos = photos.slice(1, 5); // Prende le successive 4 foto
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500">
