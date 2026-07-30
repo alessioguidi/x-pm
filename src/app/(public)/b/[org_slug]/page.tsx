@@ -38,7 +38,7 @@ export default async function PublicOrganizationPage({ params }: { params: Promi
 
   // Omette le strutture nascoste is_active = false
   const { data: properties } = await supabase.from('properties')
-    .select('*, property_photos(image_url, display_order)')
+    .select('*, property_photos(image_url, display_order, media_type)')
     .eq('organization_id', org.id)
     .eq('is_active', true)
     .order('display_order', { referencedTable: 'property_photos', ascending: true, nullsFirst: false });
@@ -98,12 +98,17 @@ export default async function PublicOrganizationPage({ params }: { params: Promi
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {properties.map(p => {
               const mainPhoto = p.property_photos?.[0]?.image_url || "https://placehold.co/600x400?text=Nessuna+Foto";
+              const isVideo = p.property_photos?.[0]?.media_type === 'video' ;
               const startingPrice = minimumPrices[p.id] ? Math.min(minimumPrices[p.id], p.base_price_per_night) : p.base_price_per_night;
               return (
                 <Link key={p.id} href={`/b/${orgSlug}/p/${p.slug}`} className="group flex flex-col bg-white rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 relative translate-y-0 hover:-translate-y-2">
                   <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={mainPhoto} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out" />
+                    {isVideo ? (
+                      <video src={mainPhoto} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out" muted playsInline />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={mainPhoto} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out" />
+                    )}
                     
                     {/* Price Badge */}
                     {!p.hide_prices && (

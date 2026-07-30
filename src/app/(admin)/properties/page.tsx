@@ -10,7 +10,7 @@ export default async function PropertiesPage() {
   // Estrazione lista immobili dal database Supabase
   const { data: properties, error } = await supabase
     .from('properties')
-    .select('*, organizations(slug), property_photos(image_url, display_order)')
+    .select('*, organizations(slug), property_photos(image_url, display_order, media_type)')
     .order('display_order', { referencedTable: 'property_photos', ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false });
 
@@ -40,6 +40,7 @@ export default async function PropertiesPage() {
           <ul className="divide-y divide-gray-200">
             {properties?.map((property) => {
               const mainPhoto = property.property_photos?.[0]?.image_url || "https://placehold.co/100x100?text=No+Foto";
+              const isVideo = property.property_photos?.[0]?.media_type === 'video';
               return (
               <li key={property.id} className="hover:bg-gray-50 transition-colors group relative bg-white">
                 <Link href={`/properties/${property.id}`} className="absolute inset-0 z-0">
@@ -49,8 +50,12 @@ export default async function PropertiesPage() {
                   <div className="flex items-center gap-4">
                     {/* Immagine */}
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-100 pointer-events-auto">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={mainPhoto} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      {isVideo ? (
+                        <video src={mainPhoto} className="w-full h-full object-cover group-hover:scale-105 transition-transform" muted playsInline />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={mainPhoto} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      )}
                     </div>
                     {/* Dettagli Testuali */}
                     <div className="pointer-events-auto">
