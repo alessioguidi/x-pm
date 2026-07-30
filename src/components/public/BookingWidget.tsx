@@ -10,6 +10,8 @@ registerLocale('it', it);
 
 export default function BookingWidget({ property }: { property: any }) {
   const hidePrices = property.hide_prices ?? false;
+  const minAdvanceDays = property.min_advance_days ?? 2;
+  const minCheckInDate = (() => { const d = new Date(); d.setDate(d.getDate() + minAdvanceDays); d.setHours(0,0,0,0); return d; })();
 
   const [checkIn, setCheckIn] = useState<string>("");
   const [checkOut, setCheckOut] = useState<string>("");
@@ -226,7 +228,7 @@ export default function BookingWidget({ property }: { property: any }) {
               }}
               dateFormat="dd/MM/yyyy"
               locale="it"
-              minDate={new Date()}
+              minDate={minCheckInDate}
               filterDate={(date) => {
                 const dTime = date.getTime();
                 const isBooked = activeBookings.some(b => dTime >= parseISO(b.check_in_date).getTime() && dTime < parseISO(b.check_out_date).getTime());
@@ -248,7 +250,7 @@ export default function BookingWidget({ property }: { property: any }) {
               }}
               dateFormat="dd/MM/yyyy"
               locale="it"
-              minDate={checkIn ? (() => { const d = parseISO(checkIn); d.setDate(d.getDate() + 1); return d; })() : (() => { const t = new Date(); t.setDate(t.getDate() + 1); return t; })()}
+              minDate={checkIn ? (() => { const d = parseISO(checkIn); d.setDate(d.getDate() + 1); return d; })() : new Date(minCheckInDate.getTime() + 86400000)}
               maxDate={checkIn ? (
                  activeBookings
                    .map(b => parseISO(b.check_in_date))

@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, ChevronLeft, ChevronRight, Grid } from "lucide-react";
 
 export default function LightboxGallery({ photos }: { photos: any[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
 
   const mainPhoto = photos.length > 0 ? photos[0].image_url : "https://placehold.co/1200x800?text=Nessuna+Foto";
   const extraPhotos = photos.slice(1, 5);
@@ -41,6 +43,22 @@ export default function LightboxGallery({ photos }: { photos: any[] }) {
   const prevPhoto = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const diff = touchStartX.current - touchEndX.current;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) nextPhoto();
+      else prevPhoto();
+    }
   };
 
   return (
@@ -104,7 +122,12 @@ export default function LightboxGallery({ photos }: { photos: any[] }) {
             <ChevronLeft className="w-10 h-10" />
           </button>
           
-          <div className="relative w-full h-full max-w-5xl max-h-[85vh] flex items-center justify-center p-4">
+          <div
+            className="relative w-full h-full max-w-5xl max-h-[85vh] flex items-center justify-center p-4"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               key={currentIndex}

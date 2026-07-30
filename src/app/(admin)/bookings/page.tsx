@@ -78,7 +78,7 @@ export default function BookingsPage() {
       supabase.from('bookings')
         .select('*, properties(name), cash_transactions(amount, status), contacts(*)')
         .in('status', ['lead_new', 'quote_sent', 'negotiation', 'closed_lost', 'pending', 'confirmed', 'cancelled'])
-        .order('check_in_date', { ascending: false }),
+        .order('created_at', { ascending: false }),
       supabase.from('properties')
         .select('id, name, organization_id, base_price_per_night, cleaning_fee, pet_fee, city_tax_per_night, city_tax_max_nights, city_tax_child_age, deposit_percentage, security_deposit, max_guests, extra_services, house_rules, default_checkin_staff_id, default_cleaning_staff_id'),
       supabase.from('contacts')

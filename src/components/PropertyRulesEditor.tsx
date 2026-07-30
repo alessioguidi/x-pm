@@ -30,6 +30,7 @@ export default function PropertyRulesEditor({ property }: { property: any }) {
   const [checkInMethod, setCheckInMethod] = useState(property.check_in_method || "Host welcome");
   const [checkInInstructions, setCheckInInstructions] = useState(property.check_in_instructions || "");
   const [houseManual, setHouseManual] = useState(property.house_manual || "");
+  const [minAdvanceDays, setMinAdvanceDays] = useState(property.min_advance_days ?? 2);
 
   const handleSave = async () => {
     setLoading(true);
@@ -41,7 +42,8 @@ export default function PropertyRulesEditor({ property }: { property: any }) {
          cancellation_policy: cancellationPolicy,
          check_in_method: checkInMethod,
          check_in_instructions: checkInInstructions,
-         house_manual: houseManual
+         house_manual: houseManual,
+         min_advance_days: minAdvanceDays
       })
       .eq("id", property.id);
 
@@ -105,9 +107,16 @@ export default function PropertyRulesEditor({ property }: { property: any }) {
               <div className="flex-1">
                 <label className="text-xs text-gray-500 mb-1 block">Fine Orario di Silenzio</label>
                 <input type="time" className="w-full border rounded p-2 focus:ring-blue-500" value={rules.quiet_hours_end} onChange={(e) => setRules({...rules, quiet_hours_end: e.target.value})} />
-              </div>
-            </div>
           </div>
+        </div>
+        </div>
+
+        <div className="p-4 border rounded-lg hover:border-blue-300 transition-colors">
+          <div className="flex items-center gap-4">
+            <label className="font-medium text-gray-900">Giorni di preavviso per prenotazione</label>
+            <input type="number" min="0" max="365" className="w-20 border rounded p-2 text-gray-900 focus:ring-blue-500" value={minAdvanceDays} onChange={e => setMinAdvanceDays(Number(e.target.value))} />
+          </div>
+        </div>
         </div>
       </section>
 
