@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/utils/supabase/client";
-import { ChevronLeft, ChevronRight, Loader2, CheckSquare, Calendar as CalendarIcon, User, Layers, Search, MapPin, Plus, Check, Settings, X, Edit2, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, CheckSquare, Calendar as CalendarIcon, User, Layers, Search, MapPin, Plus, Check, Settings, X, Edit2, Trash2, ExternalLink } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, addMonths, subMonths, addWeeks, subWeeks, isSameDay, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
+import Link from "next/link";
 import toast from "react-hot-toast";
 
 interface ActivityType {
@@ -106,18 +107,11 @@ export default function TasksPage() {
        .gte('scheduled_date', monthStartStr)
        .lte('scheduled_date', monthEndStr);
 
-    // Fetch notification tasks from tasks table
-    const { data: notificationTasks } = await supabase.from('tasks')
-       .select('*, properties(id, name)')
-       .in('task_type', ['send_checkin_link', 'send_deposit_link', 'send_checkout_link'])
-       .gte('task_date', monthStartStr)
-       .lte('task_date', monthEndStr);
-
+    // Fetch Bookings for Virtual Tasks
     const persistedVirtualIds = new Set(dbTasks?.map(t => t.virtual_id_reference).filter(Boolean));
 
-    // Fetch Bookings for Virtual Tasks
     const { data: bookings } = await supabase.from('bookings')
-      .select('*, properties(id, name, default_checkin_staff_id, default_checkout_staff_id, default_cleaning_staff_id)')
+      .select('*, properties(id, name, default_checkin_staff_id, default_checkout_staff_id, default_cleaning_staff_id, deposit_method)')
       .in('status', ['pending', 'confirmed'])
       .or(`check_in_date.gte.${monthStartStr},check_out_date.gte.${monthStartStr}`);
 
@@ -177,29 +171,15 @@ export default function TasksPage() {
       addVirtual(`${b.id}-in`, b.check_in_date, 'Check-in', c_in);
       addVirtual(`${b.id}-out`, b.check_out_date, 'Check-out', c_out);
       addVirtual(`${b.id}-clean`, b.check_out_date, 'Pulizie', c_clean);
-    });
 
-    // Parse notification tasks
-    const notificationTypeMap: Record<string, string> = {
-       send_checkin_link: 'Invio Link Check-in',
-       send_deposit_link: 'Invio Link Cauzione',
-       send_checkout_link: 'Invio Link Check-out',
-    };
-    notificationTasks?.forEach(nt => {
-       const typeLabel = notificationTypeMap[nt.task_type] || nt.task_type;
-       allTasks.push({
-         id: nt.id,
-         isVirtual: false,
-         type: typeLabel,
-         color: 'bg-violet-100 text-violet-800 border-violet-300',
-         date: nt.task_date,
-         staff_id: nt.staff_member_id,
-         staff_name: nt.staff_member_id ? staffMap.get(nt.staff_member_id) : null,
-         property: nt.properties || null,
-         booking: null,
-         status: nt.status,
-         notes: nt.notes,
-       });
+      // Notification link tasks
+      const checkInLinkDate = new Date(b.check_in_date);
+      checkInLinkDate.setDate(checkInLinkDate.getDate() - 1);
+      addVirtual(`${b.id}-checkin-link`, checkInLinkDate.toISOString().split('T')[0], 'Invio Link Check-in', '');
+      if (p.deposit_method === 'stripe') {
+        addVirtual(`${b.id}-deposit-link`, b.check_in_date, 'Invio Link Cauzione', '');
+      }
+      addVirtual(`${b.id}-checkout-link`, b.check_out_date, 'Invio Link Check-out', '');
     });
 
     setTasks(allTasks);
@@ -342,7 +322,12 @@ export default function TasksPage() {
                 {isCompleted && <Check className="w-3 h-3"/>}
                 {task.type}
              </span>
-             {task.booking && <span className="text-gray-500 bg-white/50 px-1 rounded-sm">{task.booking.guest_name?.split(' ')[0]}</span>}
+              {task.booking && <span className="text-gray-500 bg-white/50 px-1 rounded-sm flex items-center gap-1">
+                {task.booking.guest_name?.split(' ')[0]}
+                <Link href={`/bookings/${task.booking.id}`} onClick={(e) => e.stopPropagation()} className="hover:text-blue-600 transition-colors">
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </Link>
+              </span>}
            </div>
            <div className="flex flex-col gap-0.5">
               {task.property && <span className="truncate flex items-center gap-1"><Layers className="w-2.5 h-2.5 opacity-50"/> {task.property.name}</span>}
@@ -577,17 +562,22 @@ export default function TasksPage() {
                      </select>
                   </div>
 
-                  <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Collega a Prenot.</label>
-                     <select name="booking_id" defaultValue={taskModal.task?.booking?.id || ""} className="w-full border p-2.5 rounded-xl bg-white">
-                        <option value="">Nessun Collegamento CRM</option>
-                        {activeDeals.map(d => (
-                            <option key={d.id} value={d.id}>
-                               {d.guest_name} ({['pending', 'confirmed'].includes(d.status) ? 'Prenot.' : 'Trattativa'})
-                            </option>
-                        ))}
-                     </select>
-                  </div>
+                   <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Collega a Prenot.</label>
+                      <select name="booking_id" defaultValue={taskModal.task?.booking?.id || ""} className="w-full border p-2.5 rounded-xl bg-white">
+                         <option value="">Nessun Collegamento CRM</option>
+                         {activeDeals.map(d => (
+                             <option key={d.id} value={d.id}>
+                                {d.guest_name} ({['pending', 'confirmed'].includes(d.status) ? 'Prenot.' : 'Trattativa'})
+                             </option>
+                         ))}
+                      </select>
+                      {taskModal.task?.booking?.id && (
+                        <Link href={`/bookings/${taskModal.task.booking.id}`} onClick={() => setTaskModal({open: false})} className="mt-2 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-bold transition-colors">
+                          <ExternalLink className="w-3 h-3" /> Apri scheda prenotazione
+                        </Link>
+                      )}
+                   </div>
 
                   <div>
                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Stato Attività</label>
