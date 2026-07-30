@@ -10,7 +10,8 @@ export default async function PropertiesPage() {
   // Estrazione lista immobili dal database Supabase
   const { data: properties, error } = await supabase
     .from('properties')
-    .select('*, organizations(slug), property_photos(image_url)')
+    .select('*, organizations(slug), property_photos(image_url, display_order)')
+    .order('display_order', { referencedTable: 'property_photos', ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false });
 
   return (
