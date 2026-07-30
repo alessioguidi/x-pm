@@ -88,9 +88,11 @@ export default async function PublicOrganizationPage({ params }: { params: Promi
                     <img src={mainPhoto} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out" />
                     
                     {/* Price Badge */}
+                    {!p.hide_prices && (
                     <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-4 py-2 rounded-2xl text-sm font-bold shadow-lg" style={{ color: 'var(--theme-color)'}}>
                       Da €{startingPrice} <span className="text-gray-400 font-normal text-xs">/notte</span>
                     </div>
+                    )}
                   </div>
                   
                   <div className="p-8 flex flex-col flex-grow">

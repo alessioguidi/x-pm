@@ -4,8 +4,7 @@ import nodemailer from 'nodemailer';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  // Useremo l'anon key, ma il route Handler è protetto se volessimo
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -40,7 +39,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
        auth: {
          user: org.smtp_user,
          pass: org.smtp_pass
-       }
+       },
+       tls: { rejectUnauthorized: false }
     });
 
     let htmlContent = org.booking_email_template;
@@ -73,17 +73,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     // Parsing tag template anche per il Resend
-    htmlContent = htmlContent
-       .replace(/{{guest_name}}/g, booking.guest_name)
-       .replace(/{{check_in_date}}/g, booking.check_in_date.split('-').reverse().join('/'))
-       .replace(/{{check_out_date}}/g, booking.check_out_date.split('-').reverse().join('/'))
-       .replace(/{{total_price}}/g, booking.total_price)
-       .replace(/{{org_name}}/g, org.name);
+     htmlContent = htmlContent
+        .replace(/{{guest_name}}/g, booking.guest_name)
+        .replace(/{{check_in_date}}/g, booking.check_in_date.split('-').reverse().join('/'))
+        .replace(/{{check_out_date}}/g, booking.check_out_date.split('-').reverse().join('/'))
+        .replace(/{{total_price}}/g, booking.total_price)
+        .replace(/{{org_name}}/g, org.name)
+        .replace(/{{property_name}}/g, prop?.name || 'la struttura');
 
     await transporter.sendMail({
        from: `"${org.name}" <${org.smtp_from_email}>`,
        to: booking.guest_email,
-       subject: `Aggiornamento Prenotazione - ${org.name}`,
+       subject: `Aggiornamento Prenotazione: ${prop?.name || org.name}`,
        html: htmlContent
     });
 

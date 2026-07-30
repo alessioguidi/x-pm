@@ -153,6 +153,71 @@ export default function PropertyRulesEditor({ property }: { property: any }) {
         </div>
       </section>
 
+      {/* SEZIONE CAUZIONE E CHECK-OUT */}
+      <section>
+        <h3 className="text-xl font-bold text-gray-900 border-b pb-2 mb-6">Cauzione e Check-out</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Metodo Cauzione</label>
+            <select
+              value={property.deposit_method || "cash"}
+              onChange={async (e) => {
+                const val = e.target.value;
+                await supabase.from("properties").update({ deposit_method: val }).eq("id", property.id);
+                router.refresh();
+                toast.success("Metodo cauzione aggiornato");
+              }}
+              className="w-full border rounded p-2 text-gray-900 focus:ring-blue-500 outline-none"
+            >
+              <option value="cash">Contanti in loco</option>
+              <option value="stripe">Pre-autorizzazione Stripe</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Checklist Check-out</label>
+            <p className="text-xs text-gray-500 mb-2">Voci da far verificare all'ospite prima di lasciare la struttura.</p>
+            {(property.checkout_checklist || []).map((item: string, i: number) => (
+              <div key={i} className="flex items-center gap-2 mb-2">
+                <input
+                  type="text"
+                  value={item}
+                  onChange={async (e) => {
+                    const list = [...(property.checkout_checklist || [])];
+                    list[i] = e.target.value;
+                    await supabase.from("properties").update({ checkout_checklist: list }).eq("id", property.id);
+                    router.refresh();
+                  }}
+                  className="flex-1 border rounded p-2 text-sm text-gray-900 focus:ring-blue-500 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const list = (property.checkout_checklist || []).filter((_: any, idx: number) => idx !== i);
+                    await supabase.from("properties").update({ checkout_checklist: list }).eq("id", property.id);
+                    router.refresh();
+                    toast.success("Voce rimossa");
+                  }}
+                  className="text-red-500 hover:text-red-700 p-1"
+                >
+                  X
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={async () => {
+                const list = [...(property.checkout_checklist || []), ""];
+                await supabase.from("properties").update({ checkout_checklist: list }).eq("id", property.id);
+                router.refresh();
+              }}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              + Aggiungi voce
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* SEZIONE POLICY */}
       <section>
         <h3 className="text-xl font-bold text-gray-900 border-b pb-2 mb-6">Cancellazione e Penali</h3>

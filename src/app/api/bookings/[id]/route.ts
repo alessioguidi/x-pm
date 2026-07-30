@@ -60,38 +60,29 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
        
        if (template && (org.smtp_host || org.smtp_config?.host)) {
           console.log("[SMTP] Dispatching email to:", booking.guest_email);
-          const reqOrigin = new URL(req.url).origin;
           let html = template
              .replace(/{{guest_name}}/g, booking.guest_name)
              .replace(/{{check_in_date}}/g, booking.check_in_date.split('-').reverse().join('/'))
              .replace(/{{check_out_date}}/g, booking.check_out_date.split('-').reverse().join('/'))
              .replace(/{{total_price}}/g, booking.total_price)
-             .replace(/{{org_name}}/g, org.name || "Agency")
-             .replace(/{{check_in_link}}/g, `<a href="${reqOrigin}/guest/${booking.id}/checkin" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;">Completa Check-in Online</a>`);
-
-          // Fallback se l'host non ha inserito il placeholder {{check_in_link}} nel template mail
-          if (status === 'confirmed' && !template.includes('{{check_in_link}}')) {
-              html += `<br><br><hr><div style="text-align:center; padding-top:20px;">
-                        <p style="font-weight:bold; color:#d97706;">IMPORTANTE: Compila la Schedina Alloggiati per la Questura!</p>
-                        <a href="${reqOrigin}/guest/${booking.id}/checkin" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;">VAI AL CHECK-IN ONLINE</a>
-                      </div>`;
-          }
+             .replace(/{{org_name}}/g, org.name || "Agency");
 
           const host = org.smtp_host || org.smtp_config?.host;
           const port = org.smtp_port || org.smtp_config?.port || 465;
           const secure = Number(port) === 465;
 
-          try {
-             // Cerca di usare le vecchie colonne o il config jsonb
-             const transporter = nodemailer.createTransport({
-                 host: host,
-                 port: Number(port),
-                 secure: secure,
-                 auth: { 
-                     user: org.smtp_user || org.smtp_config?.user, 
-                     pass: org.smtp_pass || org.smtp_config?.pass 
-                 }
-             });
+           try {
+              // Cerca di usare le vecchie colonne o il config jsonb
+              const transporter = nodemailer.createTransport({
+                  host: host,
+                  port: Number(port),
+                  secure: secure,
+                  auth: { 
+                      user: org.smtp_user || org.smtp_config?.user, 
+                      pass: org.smtp_pass || org.smtp_config?.pass 
+                  },
+                  tls: { rejectUnauthorized: false }
+              });
 
              await transporter.sendMail({
                  from: `"${org.name}" <${org.smtp_from_email || org.smtp_user || org.smtp_config?.fromEmail}>`,

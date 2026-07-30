@@ -9,6 +9,8 @@ import { it } from "date-fns/locale/it";
 registerLocale('it', it);
 
 export default function BookingWidget({ property }: { property: any }) {
+  const hidePrices = property.hide_prices ?? false;
+
   const [checkIn, setCheckIn] = useState<string>("");
   const [checkOut, setCheckOut] = useState<string>("");
   const [adults, setAdults] = useState<number>(1);
@@ -34,6 +36,7 @@ export default function BookingWidget({ property }: { property: any }) {
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
+  const [guestNotes, setGuestNotes] = useState("");
   const allowedMethods = property.organizations?.allowed_payment_methods || ["Contante"];
   const [paymentMethod, setPaymentMethod] = useState(allowedMethods[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -169,8 +172,9 @@ export default function BookingWidget({ property }: { property: any }) {
           pet_fee: petsTotal,
           total_price: grandTotal,
           extra_services: selectedExtras,
-          payment_method: paymentMethod,
-          notes: "Prenotazione rapida da Marketplace"
+          payment_method: hidePrices ? '' : paymentMethod,
+          notes: hidePrices ? guestNotes : "Prenotazione rapida da Marketplace",
+          hide_prices: hidePrices
         })
       });
       
@@ -192,7 +196,7 @@ export default function BookingWidget({ property }: { property: any }) {
   return (
     <div className="sticky top-28 bg-white border border-gray-200 rounded-2xl shadow-xl p-6">
       <div className="mb-6">
-        {nights > 0 ? (
+        {!hidePrices && nights > 0 ? (
            <>
               <span className="text-xl font-bold text-gray-900 block flex items-baseline gap-2">
                  € {Math.round(baseTotal / nights)} <span className="text-sm font-normal text-gray-500">medi / notte</span>
@@ -201,6 +205,10 @@ export default function BookingWidget({ property }: { property: any }) {
                  {nights} {nights === 1 ? 'notte' : 'notti'} selezionate
               </span>
            </>
+        ) : hidePrices && nights > 0 ? (
+           <span className="text-sm text-gray-500 font-medium">
+              {nights} {nights === 1 ? 'notte' : 'notti'} selezionate
+           </span>
         ) : (
            <h3 className="text-lg font-bold text-gray-900">Seleziona le date</h3>
         )}
@@ -301,15 +309,15 @@ export default function BookingWidget({ property }: { property: any }) {
               onChange={(e) => setPets(Number(e.target.value))}
             >
               <option value="0">Nessuno</option>
-              <option value="1">1 Animale {property.pet_fee > 0 ? `(+ €${property.pet_fee})` : ''}</option>
-              <option value="2">2 Animali {property.pet_fee > 0 ? `(+ €${property.pet_fee * 2})` : ''}</option>
-              <option value="3">3 Animali {property.pet_fee > 0 ? `(+ €${property.pet_fee * 3})` : ''}</option>
+              <option value="1">1 Animale{!hidePrices && property.pet_fee > 0 ? ` (+ €${property.pet_fee})` : ''}</option>
+              <option value="2">2 Animali{!hidePrices && property.pet_fee > 0 ? ` (+ €${property.pet_fee * 2})` : ''}</option>
+              <option value="3">3 Animali{!hidePrices && property.pet_fee > 0 ? ` (+ €${property.pet_fee * 3})` : ''}</option>
             </select>
           </div>
         )}
 
         {/* Extra Services Selector */}
-        {availableExtras.length > 0 && (
+        {!hidePrices && availableExtras.length > 0 && (
           <div className="border border-gray-300 rounded-lg p-3">
              <label className="block text-[10px] uppercase font-bold text-gray-900 mb-2">Servizi Extra</label>
              <div className="space-y-2">
@@ -348,7 +356,7 @@ export default function BookingWidget({ property }: { property: any }) {
           style={{ backgroundColor: errorMessage || nights === 0 ? '#9ca3af' : 'var(--theme-color)'}}
           onClick={() => setIsCheckoutOpen(true)}
         >
-          {errorMessage ? 'Date non valide' : 'Invia Richiesta e Prenota'}
+          {errorMessage ? 'Date non valide' : hidePrices ? 'Richiedi Disponibilità' : 'Invia Richiesta e Prenota'}
         </button>
 
         {errorMessage && (
@@ -358,7 +366,7 @@ export default function BookingWidget({ property }: { property: any }) {
         )}
 
         {/* Breakdown Costi */}
-        {nights > 0 && !errorMessage && (
+        {!hidePrices && nights > 0 && !errorMessage && (
           <div className="border-t border-gray-100 mt-4 pt-4 space-y-2 animate-in fade-in zoom-in duration-300">
             <div className="flex justify-between text-sm text-gray-600">
               <span className="underline decoration-dotted underline-offset-2">Soggiorno base ({nights} notti)</span>
@@ -416,7 +424,7 @@ export default function BookingWidget({ property }: { property: any }) {
         )}
 
         <p className="text-center text-xs text-gray-500 pt-2 font-medium">
-          Sarai contattato dall'host per confermare la disponibilità prima di pagare.
+          {hidePrices ? "Invia una richiesta di disponibilità, ti risponderemo al più presto." : "Sarai contattato dall'host per confermare la disponibilità prima di pagare."}
         </p>
       </form>
 
@@ -427,8 +435,11 @@ export default function BookingWidget({ property }: { property: any }) {
             {isSuccess ? (
               <div className="p-8 text-center space-y-4 shadow-inner bg-green-50">
                  <div className="mx-auto w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mb-2">🎉</div>
-                 <h2 className="text-2xl font-bold text-gray-900">Prenotazione Inoltrata!</h2>
-                 <p className="text-gray-600">Hai inviato con successo la tua richiesta. L'host ti ha appena mandato una email di riepilogo a <b>{guestEmail}</b>.</p>
+                 <h2 className="text-2xl font-bold text-gray-900">{hidePrices ? "Richiesta Inviata!" : "Prenotazione Inoltrata!"}</h2>
+                 <p className="text-gray-600">{hidePrices
+                   ? `Grazie per la tua richiesta di prenotazione. Ti contatteremo al più presto all'indirizzo ${guestEmail}.`
+                   : `Hai inviato con successo la tua richiesta. L'host ti ha appena mandato una email di riepilogo a <b>${guestEmail}</b>.`
+                 }</p>
                  <button 
                    onClick={() => window.location.reload()} 
                    className="mt-6 font-bold py-3 px-6 rounded-lg bg-green-600 text-white w-full hover:bg-green-700 transition"
@@ -440,7 +451,7 @@ export default function BookingWidget({ property }: { property: any }) {
               <form onSubmit={handleCheckout} className="p-8">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Chi viaggia?</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">{hidePrices ? "Richiedi Disponibilità" : "Chi viaggia?"}</h2>
                     <p className="text-sm text-gray-500 mt-1">{adults} adulti{children > 0 ? ` + ${children} bambini` : ''}{pets > 0 ? ` + ${pets} animale/i` : ''}</p>
                   </div>
                   <button type="button" onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-700 bg-gray-100 w-8 h-8 rounded-full font-bold">×</button>
@@ -459,27 +470,37 @@ export default function BookingWidget({ property }: { property: any }) {
                     <label className="block text-xs uppercase font-bold text-gray-700 mb-1">Cellulare *</label>
                     <input type="tel" required value={guestPhone} onChange={e => setGuestPhone(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 outline-none transition" />
                   </div>
-                  <div>
-                    <label className="block text-xs uppercase font-bold text-gray-700 mb-1">Metodo Pagamento in Struttura *</label>
-                    <select required value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 outline-none transition">
-                       {allowedMethods.map((m: string) => (
-                           <option key={m} value={m}>{m}</option>
-                       ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-gray-100 space-y-1">
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Totale soggiorno:</span><span className="font-bold">€ {grandTotal}</span>
-                  </div>
-                  {property.deposit_percentage > 0 && (
-                    <div className="flex justify-between text-sm text-amber-700">
-                      <span>Caparra richiesta ({property.deposit_percentage}%):</span>
-                      <span className="font-bold">€ {Math.round(grandTotal * property.deposit_percentage / 100)}</span>
+                  {hidePrices && (
+                    <div>
+                      <label className="block text-xs uppercase font-bold text-gray-700 mb-1">Note / Messaggio</label>
+                      <textarea rows={3} value={guestNotes} onChange={e => setGuestNotes(e.target.value)} placeholder="Eventuali richieste o informazioni..." className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 outline-none transition" />
+                    </div>
+                  )}
+                  {!hidePrices && (
+                    <div>
+                      <label className="block text-xs uppercase font-bold text-gray-700 mb-1">Metodo Pagamento in Struttura *</label>
+                      <select required value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 outline-none transition">
+                         {allowedMethods.map((m: string) => (
+                             <option key={m} value={m}>{m}</option>
+                         ))}
+                      </select>
                     </div>
                   )}
                 </div>
+
+                {!hidePrices && (
+                  <div className="mt-6 pt-4 border-t border-gray-100 space-y-1">
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Totale soggiorno:</span><span className="font-bold">€ {grandTotal}</span>
+                    </div>
+                    {property.deposit_percentage > 0 && (
+                      <div className="flex justify-between text-sm text-amber-700">
+                        <span>Caparra richiesta ({property.deposit_percentage}%):</span>
+                        <span className="font-bold">€ {Math.round(grandTotal * property.deposit_percentage / 100)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <button 
                   type="submit" 
@@ -487,7 +508,7 @@ export default function BookingWidget({ property }: { property: any }) {
                   className="w-full mt-4 text-white font-bold py-4 rounded-xl shadow-md hover:shadow-lg transition-all hover:scale-[1.02] disabled:opacity-50"
                   style={{ backgroundColor: 'var(--theme-color)' }}
                 >
-                  {isSubmitting ? 'Elaborazione...' : 'Conferma e Invia Email'}
+                  {isSubmitting ? 'Elaborazione...' : hidePrices ? 'Invia Richiesta' : 'Conferma e Invia Email'}
                 </button>
               </form>
             )}

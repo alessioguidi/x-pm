@@ -74,9 +74,17 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           </div>
 
           <div>
+            {property.description && (
+              <div className="mb-10">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">La Struttura</h3>
+                <div className="prose prose-gray max-w-none text-gray-600">
+                  <p className="whitespace-pre-line">{property.description}</p>
+                </div>
+              </div>
+            )}
             <h3 className="text-xl font-bold text-gray-900 mb-4">L'Host: {property.organizations.name}</h3>
             <div className="prose prose-gray max-w-none text-gray-600 space-y-4">
-              <p>{property.organizations.description || property.description || 'Nessuna descrizione è stata ancora fornita dall\'host per questa incantevole struttura.'}</p>
+              <p>{property.organizations.description || 'Nessuna descrizione è stata ancora fornita dall\'host.'}</p>
             </div>
           </div>
 

@@ -14,7 +14,7 @@ export default function PropertyDetailTabs({ property }: { property: any }) {
   const tabs = [
     { id: 'generale', label: 'Impostazioni Generali' },
     { id: 'servizi', label: 'Servizi e Sicurezza' },
-    { id: 'regole', label: 'Regole e Check-in' },
+    { id: 'regole', label: 'Regole, Check-in e Check-out' },
     { id: 'extra', label: 'Servizi Extra' },
     { id: 'staff', label: 'Assegnazione Staff' },
     { id: 'foto', label: 'Galleria' },

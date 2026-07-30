@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, use, Suspense } from "react";
 import { supabase } from "@/utils/supabase/client";
-import { Loader2, Upload, FileImageIcon, CheckCircle2, User, Calendar, MapPin, Search } from "lucide-react";
+import { Loader2, Upload, FileImageIcon, CheckCircle2, User, Calendar, MapPin, Search, FileText, ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatDateRange } from "@/lib/format";
 
@@ -23,6 +23,8 @@ type GuestForm = {
   document_number: string;
   document_issue_country: string;
   document_issue_city: string;
+  document_front_url: string;
+  document_back_url: string;
   document_front_file: File | null;
   document_back_file: File | null;
 };
@@ -53,12 +55,12 @@ const COMMON_COUNTRIES = [
 ];
 
 const initialForm = (): GuestForm => ({
-  type: "17", // Default Capo Famiglia
+  type: "17",
   first_name: "",
   last_name: "",
   gender: "M",
   birth_date: "",
-  citizenship: "100000100", // Italia default
+  citizenship: "100000100",
   birth_country: "100000100",
   birth_city: "",
   residence_country: "100000100",
@@ -68,6 +70,8 @@ const initialForm = (): GuestForm => ({
   document_number: "",
   document_issue_country: "100000100",
   document_issue_city: "",
+  document_front_url: "",
+  document_back_url: "",
   document_front_file: null,
   document_back_file: null
 });
@@ -89,36 +93,70 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  
+
   const [form, setForm] = useState<GuestForm>(initialForm());
+  const [previewFront, setPreviewFront] = useState<string>("");
+  const [previewBack, setPreviewBack] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const [completed, setCompleted] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Ospiti già registrati per questa prenotazione
+  const [existingGuests, setExistingGuests] = useState<any[]>([]);
+  const [editingGuestId, setEditingGuestId] = useState<string | null>(null);
+  // Quando l'utente vuole aggiungere un nuovo ospite dopo aver visto la lista
+  const [showNewForm, setShowNewForm] = useState(false);
 
   useEffect(() => {
-        async function fetchBooking() {
+    // Check se l'utente è loggato (admin)
+    supabase.auth.getUser().then(({ data }) => setIsAdmin(!!data.user));
+
+    async function fetchBooking() {
       const { data, error } = await supabase
         .from('bookings')
         .select('*, properties(name)')
         .eq('id', bookingId)
         .single();
-      
+
       if (error || !data) {
         setError("Prenotazione non trovata o link scaduto.");
-      } else {
-        setBooking(data);
-        if (editId) {
-            const { data: guestData } = await supabase.from('booking_guests').select('*').eq('id', editId).single();
-            if (guestData) {
-               setForm({
-                 ...initialForm(),
-                 ...guestData,
-                 document_front_file: null,
-                 document_back_file: null
-               });
-            }
+        setLoading(false);
+        return;
+      }
+      setBooking(data);
+
+      // Carica ospiti già registrati
+      const { data: guests } = await supabase
+        .from('booking_guests')
+        .select('*')
+        .eq('booking_id', bookingId)
+        .order('created_at', { ascending: true });
+
+      const registered = guests || [];
+      setExistingGuests(registered);
+      setAddedCount(registered.length);
+
+      // Se ci sono ospiti già registrati e nessun editId, mostra la lista
+      if (registered.length > 0 && !editId) {
+        setShowNewForm(false); // mostra lista, non il form
+      }
+
+      // Se editId è presente, carica quell'ospite
+      if (editId) {
+        const guestToEdit = registered.find(g => g.id === editId);
+        if (guestToEdit) {
+          setForm({
+            ...initialForm(),
+            ...guestToEdit,
+            document_front_file: null,
+            document_back_file: null,
+          });
+          setEditingGuestId(editId);
+          setShowNewForm(true);
         }
       }
+
       setLoading(false);
     }
     fetchBooking();
@@ -129,7 +167,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
     const fileName = `${bookingId}_${Date.now()}_${Math.random()}.${fileExt}`;
     const filePath = `documents/${fileName}`;
     const { error } = await supabase.storage.from('guest_documents').upload(filePath, file);
-    if (error) return null;
+    if (error) { console.error('Upload error:', error); return null; }
     const { data } = supabase.storage.from('guest_documents').getPublicUrl(filePath);
     return data.publicUrl;
   };
@@ -143,22 +181,26 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
       let frontUrl = "";
       let backUrl = "";
 
-      // Upload documenti se espliciti
+      // Validazione anno nascita
+      const birthYear = parseInt(form.birth_date?.split("-")[0] || "0");
+      if (birthYear < 1900 || birthYear > 2100) throw new Error("Anno di nascita non valido");
+
       if (["16", "17", "18"].includes(form.type)) {
-        if (!form.document_front_file) throw new Error("Documento fronte obbligatorio per Capofamiglia/Capogruppo/Singolo.");
+        if (!form.document_front_file && !form.document_front_url) throw new Error("Documento fronte obbligatorio per Capofamiglia/Capogruppo/Singolo.");
       }
       
       if (form.document_front_file) {
         const resUrl = await uploadFile(form.document_front_file);
         if (resUrl) frontUrl = resUrl;
+        else { toast.dismiss(); throw new Error("Caricamento fronte documento fallito"); }
       }
       if (form.document_back_file) {
         const backResUrl = await uploadFile(form.document_back_file);
         if (backResUrl) backUrl = backResUrl;
+        else { toast.dismiss(); throw new Error("Caricamento retro documento fallito"); }
       }
 
-      // Persisti
-      const insertPayload = {
+      const payload: Record<string, any> = {
         booking_id: bookingId,
         type: form.type,
         first_name: form.first_name,
@@ -173,38 +215,46 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
         residence_address: form.residence_address,
         document_type: form.document_type,
         document_number: form.document_number,
-        document_issue_country: form.document_issue_country,
-        document_issue_city: form.document_issue_city,
-        document_front_url: frontUrl || null,
-        document_back_url: backUrl || null
       };
 
-            if (editId) {
-         // Se stiamo modificando, puliamo i dump url
-         if (!frontUrl) (insertPayload as any).document_front_url = undefined;
-         if (!backUrl) (insertPayload as any).document_back_url = undefined;
-         
-         const { error: dbError } = await supabase.from('booking_guests').update(insertPayload).eq('id', editId);
-         if (dbError) throw dbError;
-         
-         toast.dismiss();
-         toast.success("Ospite aggiornato con successo!");
-         setTimeout(() => window.close(), 1500); // chiude la modale/tab dopo l'edit
+      // Solo se c'è un nuovo upload, aggiorna l'URL
+      if (frontUrl) payload.document_front_url = frontUrl;
+      if (backUrl) payload.document_back_url = backUrl;
+
+      // Preserva campi non presenti nel form ma esistenti nel DB
+      if (!form.document_issue_country) delete payload.document_issue_country;
+      if (!form.document_issue_city) delete payload.document_issue_city;
+
+      if (editingGuestId) {
+        const { error: dbError } = await supabase.from('booking_guests').update(payload).eq('id', editingGuestId);
+        if (dbError) throw dbError;
+        toast.dismiss();
+        toast.success("Ospite aggiornato!");
       } else {
-         const { error: dbError } = await supabase.from('booking_guests').insert(insertPayload);
-         if (dbError) throw dbError;
+        const { error: dbError } = await supabase.from('booking_guests').insert(payload);
+        if (dbError) throw dbError;
+        toast.dismiss();
+        toast.success("Ospite registrato!");
+      }
 
-         toast.dismiss();
-         toast.success("Ospite registrato con successo!");
-         
-         const newCount = addedCount + 1;
-         setAddedCount(newCount);
+      // Ricarica la lista ospiti
+      const { data: guests } = await supabase
+        .from('booking_guests')
+        .select('*')
+        .eq('booking_id', bookingId)
+        .order('created_at', { ascending: true });
+      setExistingGuests(guests || []);
+      setAddedCount(guests?.length || 0);
 
-         if (booking?.guests_count && newCount >= booking.guests_count) {
-            setCompleted(true);
-         } else {
-            setForm(initialForm());
-         }
+      // Resetta form
+      setForm(initialForm());
+      setPreviewFront("");
+      setPreviewBack("");
+      setEditingGuestId(null);
+      setShowNewForm(false);
+
+      if (guests && booking?.guests_count && guests.length >= booking.guests_count) {
+        setCompleted(true);
       }
     } catch(err: any) {
       toast.dismiss();
@@ -215,7 +265,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
   };
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-gray-50"><Loader2 className="w-10 h-10 animate-spin text-blue-600"/></div>;
-  if (error || !booking) return <div className="flex h-screen items-center justify-center p-4 text-center text-gray-500">{error}</div>;
+  if (error || !booking) return <div className="flex h-screen items-center justify-center p-4 text-center text-gray-500">{error}<br/>{isAdmin && <><a href="/bookings" className="mt-4 inline-flex items-center gap-1 text-blue-600 font-bold hover:underline text-sm"><ArrowLeft className="w-3.5 h-3.5" /> Torna alle prenotazioni</a></>}</div>;
 
   if (completed) {
     return (
@@ -224,8 +274,11 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                <CheckCircle2 className="w-8 h-8 text-green-600"/>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check-in Completato</h2>
-            <p className="text-gray-500">Grazie per aver inserito i dati per tutti gli ospiti. Ti aspettiamo presso {booking.properties?.name}!</p>
+             <h2 className="text-2xl font-bold text-gray-900 mb-2">Check-in Completato</h2>
+              <p className="text-gray-500">Grazie per aver inserito i dati per tutti gli ospiti. Ti aspettiamo presso {booking.properties?.name}!</p>
+              {isAdmin && <a href={`/bookings/${bookingId}`} className="mt-6 inline-flex items-center gap-1 text-blue-600 font-bold hover:underline text-sm">
+                <ArrowLeft className="w-3.5 h-3.5" /> Torna alla prenotazione
+              </a>}
          </div>
       </div>
     );
@@ -237,8 +290,13 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="bg-gradient-to-r from-blue-700 to-blue-500 rounded-2xl p-6 mb-8 text-white shadow-lg relative overflow-hidden">
+          {isAdmin && (
+          <a href={`/bookings/${bookingId}`} className="inline-flex items-center gap-1 text-blue-200 hover:text-white text-xs font-bold mb-3 transition">
+            <ArrowLeft className="w-3.5 h-3.5" /> Torna alla prenotazione
+          </a>
+          )}
           <div className="relative z-10">
-             <h1 className="text-2xl font-extrabold mb-1">Registrazione Ospiti Alloggiati</h1>
+             <h1 className="text-2xl font-extrabold mb-1">Registrazione Ospiti</h1>
              <p className="text-blue-100 font-medium opacity-90"><MapPin className="inline w-4 h-4 mr-1"/> {booking.properties?.name}</p>
              <div className="mt-4 flex flex-col md:flex-row gap-4 divide-y md:divide-y-0 md:divide-x divide-blue-400">
                <div className="pt-2 md:pt-0">
@@ -258,8 +316,82 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
           <User className="absolute -right-6 -bottom-10 w-48 h-48 text-white opacity-10 pointer-events-none"/>
         </div>
 
+        {/* Lista ospiti già registrati */}
+        {existingGuests.length > 0 && !showNewForm && !editingGuestId && (
+          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-6 mb-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Ospiti Registrati</h2>
+            <div className="space-y-3">
+                  {existingGuests.map(guest => (
+                <div key={guest.id} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-800">{guest.first_name} {guest.last_name}</p>
+                      <p className="text-xs text-gray-500">
+                        {guest.document_type} · {guest.document_number || "N/D"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setForm({
+                          ...initialForm(),
+                          ...guest,
+                          document_front_file: null,
+                          document_back_file: null,
+                        });
+                        setEditingGuestId(guest.id);
+                        setShowNewForm(true);
+                      }}
+                      className="text-xs font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-full hover:bg-blue-100"
+                    >
+                      Modifica
+                    </button>
+                  </div>
+                  {(guest.document_front_url || guest.document_back_url) && (
+                    <div className="flex gap-2 mt-3">
+                      {guest.document_front_url && (
+                        <a href={guest.document_front_url} target="_blank" rel="noopener noreferrer" className="block relative w-20 h-14 rounded-lg overflow-hidden border border-gray-200 bg-white hover:ring-2 hover:ring-blue-400 transition flex items-center justify-center">
+                          {guest.document_front_url.endsWith('.pdf') ? (
+                            <FileText className="w-6 h-6 text-red-500" />
+                          ) : (
+                            <img src={guest.document_front_url} alt="Fronte documento" className="w-full h-full object-cover" />
+                          )}
+                        </a>
+                      )}
+                      {guest.document_back_url && (
+                        <a href={guest.document_back_url} target="_blank" rel="noopener noreferrer" className="block relative w-20 h-14 rounded-lg overflow-hidden border border-gray-200 bg-white hover:ring-2 hover:ring-blue-400 transition flex items-center justify-center">
+                          {guest.document_back_url.endsWith('.pdf') ? (
+                            <FileText className="w-6 h-6 text-red-500" />
+                          ) : (
+                            <img src={guest.document_back_url} alt="Retro documento" className="w-full h-full object-cover" />
+                          )}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {addedCount < (booking.guests_count || 99) && (
+              <button
+                onClick={() => {
+                  setForm(initialForm());
+                  setEditingGuestId(null);
+                  setShowNewForm(true);
+                }}
+                className="w-full mt-4 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition"
+              >
+                + Aggiungi un altro ospite
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Form di inserimento/modifica */}
+        {(showNewForm || editingGuestId) && (
         <form onSubmit={handleSubmit} className="bg-white shadow-sm border border-gray-200 rounded-2xl p-6 md:p-8">
-           <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Inserisci le generalità dell'ospite {addedCount + 1}</h2>
+           <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">
+             {editingGuestId ? `Modifica ${form.first_name} ${form.last_name}` : `Inserisci generalità ospite ${addedCount + 1}`}
+           </h2>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div className="md:col-span-2">
@@ -361,28 +493,86 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                 </div>
              </div>
 
-             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                <label className="border-2 border-dashed border-gray-300 hover:border-blue-500 bg-gray-50 hover:bg-blue-50 transition p-6 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-center h-32">
-                   <Upload className="w-6 h-6 text-gray-400 mb-2"/>
-                   <span className="text-sm font-bold text-gray-700">Carica Fronte Documento</span>
-                   <span className="text-xs text-gray-500 mt-1">{form.document_front_file ? form.document_front_file.name : 'Nessun file'}</span>
-                   <input type="file" className="hidden" accept="image/*,application/pdf" onChange={e => e.target.files && setForm({...form, document_front_file: e.target.files[0]})} />
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                <label className="border-2 border-dashed border-gray-300 rounded-2xl p-4 bg-gray-50 min-h-[8rem] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition">
+                   {(form.document_front_url && !form.document_front_file) || previewFront ? (
+                     <>
+                       {(previewFront || form.document_front_url).endsWith('.pdf') ? (
+                         <FileText className="w-10 h-10 text-red-400 mb-2" />
+                       ) : (
+                         <img src={previewFront || form.document_front_url} alt="Fronte documento" className="max-h-24 object-contain mb-2 rounded" />
+                       )}
+                     </>
+                   ) : (
+                     <Upload className="w-6 h-6 mx-auto mb-1 text-gray-400" />
+                   )}
+                   <span className="text-sm font-bold text-gray-700 block">
+                     {form.document_front_file ? form.document_front_file.name : form.document_front_url ? 'Clicca per cambiare' : 'Carica Fronte Documento'}
+                   </span>
+                   <input type="file" className="hidden" accept="image/*,.pdf" onChange={e => {
+                     if (e.target.files) {
+                       const file = e.target.files[0];
+                       setForm({...form, document_front_file: file});
+                       if (file) setPreviewFront(URL.createObjectURL(file));
+                     }
+                   }} />
                 </label>
 
-                <label className="border-2 border-dashed border-gray-300 hover:border-blue-500 bg-gray-50 hover:bg-blue-50 transition p-6 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-center h-32">
-                   <Upload className="w-6 h-6 text-gray-400 mb-2"/>
-                   <span className="text-sm font-bold text-gray-700">Carica Retro Documento</span>
-                   <span className="text-xs text-gray-500 mt-1">{form.document_back_file ? form.document_back_file.name : 'Opzionale (se patente/CI)'}</span>
-                   <input type="file" className="hidden" accept="image/*,application/pdf" onChange={e => e.target.files && setForm({...form, document_back_file: e.target.files[0]})} />
+                <label className="border-2 border-dashed border-gray-300 rounded-2xl p-4 bg-gray-50 min-h-[8rem] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition">
+                   {(form.document_back_url && !form.document_back_file) || previewBack ? (
+                     <>
+                       {(previewBack || form.document_back_url).endsWith('.pdf') ? (
+                         <FileText className="w-10 h-10 text-red-400 mb-2" />
+                       ) : (
+                         <img src={previewBack || form.document_back_url} alt="Retro documento" className="max-h-24 object-contain mb-2 rounded" />
+                       )}
+                     </>
+                   ) : (
+                     <Upload className="w-6 h-6 mx-auto mb-1 text-gray-400" />
+                   )}
+                   <span className="text-sm font-bold text-gray-700 block">
+                     {form.document_back_file ? form.document_back_file.name : form.document_back_url ? 'Clicca per cambiare' : 'Carica Retro Documento'}
+                   </span>
+                   <input type="file" className="hidden" accept="image/*,.pdf" onChange={e => {
+                     if (e.target.files) {
+                       const file = e.target.files[0];
+                       setForm({...form, document_back_file: file});
+                       if (file) setPreviewBack(URL.createObjectURL(file));
+                     }
+                   }} />
                 </label>
              </div>
            </div>
 
-           <button type="submit" disabled={isSubmitting} className="w-full mt-8 bg-gray-900 text-white font-bold text-lg py-4 rounded-xl hover:bg-black transition shadow-lg flex items-center justify-center disabled:opacity-50">
-              {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin mr-2"/> : <CheckCircle2 className="w-6 h-6 mr-2"/>}
-              {isSubmitting ? 'Salvataggio...' : `Conferma ed Aggiungi Ospite (${addedCount + 1}/${booking.guests_count})`}
-           </button>
+           <div className="flex gap-3 mt-8">
+              {editingGuestId && (
+               <button type="button" onClick={() => { setForm(initialForm()); setPreviewFront(""); setPreviewBack(""); setEditingGuestId(null); setShowNewForm(false); }}
+                 className="flex-1 bg-gray-200 text-gray-700 font-bold text-lg py-4 rounded-xl hover:bg-gray-300 transition">
+                 Annulla
+               </button>
+             )}
+             <button type="submit" disabled={isSubmitting} className={`${editingGuestId ? 'flex-1' : 'w-full'} bg-gray-900 text-white font-bold text-lg py-4 rounded-xl hover:bg-black transition shadow-lg flex items-center justify-center disabled:opacity-50`}>
+               {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin mr-2"/> : <CheckCircle2 className="w-6 h-6 mr-2"/>}
+               {isSubmitting ? 'Salvataggio...' : editingGuestId ? 'Salva Modifiche' : `Conferma e Aggiungi Ospite (${addedCount + 1}/${booking.guests_count})`}
+             </button>
+           </div>
         </form>
+        )}
+
+        {/* Stato iniziale: nessun ospite ancora registrato, mostra pulsante per iniziare */}
+        {existingGuests.length === 0 && !showNewForm && !editingGuestId && (
+          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-12 text-center">
+            <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Nessun ospite registrato</h2>
+            <p className="text-gray-500 mb-6">Inizia inserendo i dati del primo ospite.</p>
+            <button
+              onClick={() => setShowNewForm(true)}
+              className="bg-blue-600 text-white font-bold px-8 py-4 rounded-xl hover:bg-blue-700 transition text-lg"
+            >
+              Inizia Registrazione
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

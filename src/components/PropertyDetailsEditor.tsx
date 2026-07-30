@@ -34,16 +34,40 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
     city_tax_per_night: property.city_tax_per_night ?? 2,
     city_tax_max_nights: property.city_tax_max_nights ?? 10,
     city_tax_child_age: property.city_tax_child_age ?? 11,
+    hide_prices: property.hide_prices ?? false,
     bedrooms: property.bedrooms || 1,
     max_guests: property.max_guests || 2,
-    is_active: property.is_active || false
+    is_active: property.is_active || false,
   });
+
+  const toSlug = (text: string) =>
+    text.toLowerCase()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "");
 
   const handleSave = async () => {
     setLoading(true);
+    const payload: any = { ...formData };
+    const baseSlug = toSlug(formData.name);
+    if (baseSlug && baseSlug !== property.slug) {
+      let finalSlug = baseSlug;
+      const { data: existing } = await supabase
+        .from("properties")
+        .select("id, slug")
+        .neq("id", property.id)
+        .filter("slug", "like", `${baseSlug}%`);
+      const slugs = new Set((existing || []).map((p: any) => p.slug));
+      let i = 1;
+      while (slugs.has(finalSlug)) {
+        finalSlug = `${baseSlug}-${i++}`;
+      }
+      payload.slug = finalSlug;
+    }
     const { error } = await supabase
       .from("properties")
-      .update(formData)
+      .update(payload)
       .eq("id", property.id);
 
     if (error) {
@@ -51,7 +75,7 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
       console.error(error);
     } else {
       setIsEditing(false);
-      router.refresh(); // Forza next a fetchare i dati freschi (Server Component)
+      router.refresh();
       toast.success("Dati aggiornati con successo!");
     }
     setLoading(false);
@@ -182,6 +206,14 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
                ))}
              </div>
           </div>
+        </div>
+
+        <div className="pt-4 border-t mt-4 border-gray-100 flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
+           <input type="checkbox" className="w-4 h-4 text-blue-600" checked={!formData.hide_prices} onChange={e => setFormData({...formData, hide_prices: !e.target.checked})} />
+           <div>
+             <label className="text-xs font-bold text-gray-700">Prezzi e costi visibili sul form di prenotazione</label>
+             <p className="text-[10px] text-gray-400">Se disabilitato, il form mostra solo disponibilità e richiesta dati cliente (senza prezzi)</p>
+           </div>
         </div>
 
         <div className="pt-4 border-t mt-4 border-gray-100">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/utils/supabase/client";
-import { CreditCard, Save, Plus, Trash2, Send, Edit2, Check, X } from "lucide-react";
+import { CreditCard, Save, Plus, Trash2, Send, Edit2, Check, X, ShieldCheck, Undo2 } from "lucide-react";
 import { formatCurrency, formatDateStr } from "@/lib/format";
 import toast from "react-hot-toast";
 
@@ -139,7 +139,48 @@ export default function BookingFinancials({ booking: initialBooking, onBookingUp
     toast.loading("Invio email in corso...", { id: "resendM" });
     const res = await fetch(`/api/bookings/${booking.id}/resend`, { method: "POST" });
     if (res.ok) toast.success("Riepilogo inviato al cliente!", { id: "resendM" });
-    else toast.error("Errore invio email", { id: "resendM" });
+    else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || "Errore invio email", { id: "resendM" });
+    }
+  };
+
+  const handleCopyCheckinLink = () => {
+    const link = `${window.location.origin}/guest/${booking.id}/checkin`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link check-in copiato negli appunti!");
+  };
+
+  const handleCopyCheckoutLink = () => {
+    const link = `${window.location.origin}/guest/${booking.id}/checkout`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link check-out copiato negli appunti!");
+  };
+
+  const handleSendDepositLink = async () => {
+    toast.loading("Creazione pre-autorizzazione...", { id: "deposit" });
+    try {
+      const { error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw new Error("Devi effettuare il login");
+
+      const res = await fetch("/api/stripe/deposit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({ action: "create", booking_id: booking.id }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const link = `${window.location.origin}/stripe-pay/${data.payment_intent_id}`;
+      await navigator.clipboard.writeText(link);
+      toast.success("Link pre-autorizzazione copiato negli appunti!", { id: "deposit" });
+    } catch (err: any) {
+      toast.error(err.message, { id: "deposit" });
+    }
   };
 
   const handleAddPayment = async () => {
@@ -178,6 +219,41 @@ export default function BookingFinancials({ booking: initialBooking, onBookingUp
     });
     if (res.ok) { toast.success("Pagamento confermato!", { id: 'confirmPay' }); fetchPayments(); }
     else toast.error("Errore conferma pagamento", { id: 'confirmPay' });
+  };
+
+  const handleReturnDeposit = async (payment: any) => {
+    const bookingId = booking.id;
+    if (booking.deposit_status === "authorized" && booking.stripe_payment_intent_id) {
+      if (!confirm("Restituire la cauzione? La pre-autorizzazione Stripe verrà annullata.")) return;
+      toast.loading("Rilascio pre-autorizzazione...", { id: "ret" });
+      const { data } = await supabase.auth.getSession();
+      const res = await fetch("/api/stripe/deposit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token}` },
+        body: JSON.stringify({ action: "release", payment_intent_id: booking.stripe_payment_intent_id, booking_id: bookingId }),
+      });
+      if (!res.ok) { toast.error("Errore rilascio", { id: "ret" }); return; }
+      await supabase.from("cash_transactions").update({ status: "cancelled" }).eq("id", payment.id);
+      toast.success("Cauzione restituita!", { id: "ret" });
+    } else {
+      if (!confirm("Registrare l'uscita di cassa per la restituzione della cauzione?")) return;
+      toast.loading("Registrazione...", { id: "ret" });
+      const { error } = await supabase.from("cash_transactions").insert({
+        organization_id: booking.organization_id,
+        property_id: booking.property_id,
+        booking_id: bookingId,
+        amount: -Math.abs(payment.amount),
+        status: "confirmed",
+        payment_method: "Contante",
+        reason: "Restituzione Cauzione",
+        transaction_type: "expense",
+        notes: "Cauzione restituita al check-out",
+      });
+      if (error) { toast.error("Errore registrazione", { id: "ret" }); return; }
+      await supabase.from("cash_transactions").update({ status: "completed" }).eq("id", payment.id);
+      toast.success("Uscita registrata!", { id: "ret" });
+    }
+    fetchPayments();
   };
 
   const handleRemovePayment = async (id: string) => {
@@ -260,9 +336,6 @@ export default function BookingFinancials({ booking: initialBooking, onBookingUp
         <h3 className="font-bold flex items-center text-gray-800">
           <CreditCard className="w-5 h-5 mr-2 text-green-600" /> Cassa & Servizi
         </h3>
-        <button onClick={handleResendEmail} className="text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 px-4 py-2.5 rounded-full flex items-center hover:bg-blue-100 transition">
-          <Send className="w-3 h-3 mr-1" /> Re-invia Conferma Cliente
-        </button>
       </div>
 
       {/* ─── SCHEDA FINANZIARIA ─── */}
@@ -441,6 +514,11 @@ export default function BookingFinancials({ booking: initialBooking, onBookingUp
                     <div className="flex flex-col items-end gap-2">
                       {!isPending && <button onClick={() => handleVoidPayment(p.id)} className="text-[10px] font-bold text-amber-600 hover:text-amber-800 bg-amber-50 px-2 py-0.5 rounded hover:bg-amber-100">Annulla</button>}
                       <button onClick={() => handleRemovePayment(p.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-5 h-5"/></button>
+                      {!isPending && p.reason === "Cauzione Danni" && (
+                        <button onClick={() => handleReturnDeposit(p)} className="bg-purple-500 text-white px-3 py-2 rounded text-[10px] font-bold shadow-sm hover:bg-purple-600 uppercase flex items-center gap-1">
+                          <Undo2 className="w-3 h-3" /> Restituisci
+                        </button>
+                      )}
                       {isPending && (
                         <button onClick={() => handleConfirmPayment(p.id)} className="bg-emerald-500 text-white px-3 py-2 rounded text-[10px] font-bold shadow-sm hover:bg-emerald-600 uppercase">
                           {isCancelled ? 'Ri-Conferma Incasso' : 'Conferma Incasso'}

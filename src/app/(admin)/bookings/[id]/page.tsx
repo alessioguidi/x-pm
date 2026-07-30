@@ -314,8 +314,41 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             </button>
           </div>
           
-          <div className="ml-auto">
-             <select 
+           <div className="ml-auto flex items-center gap-2">
+              {booking.status === "confirmed" && (
+                <div className="flex flex-wrap gap-1.5 mr-3">
+                  <button onClick={() => { const l = `${window.location.origin}/guest/${id}/checkin`; navigator.clipboard.writeText(l); toast.success("Link check-in copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 px-3 py-2 rounded-full hover:bg-blue-100 transition flex items-center">
+                    <Send className="w-3 h-3 mr-1" /> Check-in
+                  </button>
+                  <button onClick={() => { const l = `${window.location.origin}/guest/${id}/checkout`; navigator.clipboard.writeText(l); toast.success("Link check-out copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-purple-50 text-purple-700 px-3 py-2 rounded-full hover:bg-purple-100 transition flex items-center">
+                    <Send className="w-3 h-3 mr-1" /> Check-out
+                  </button>
+                  <button onClick={async () => {
+                    toast.loading("Creazione pre-autorizzazione...", { id: "dep" });
+                    try {
+                      const { error: aErr } = await supabase.auth.getUser();
+                      if (aErr) throw new Error("Login richiesto");
+                      const res = await fetch("/api/stripe/deposit", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` }, body: JSON.stringify({ action: "create", booking_id: id }) });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error);
+                      const l = `${window.location.origin}/stripe-pay/${data.payment_intent_id}`;
+                      await navigator.clipboard.writeText(l);
+                      toast.success("Link cauzione copiato!", { id: "dep" });
+                    } catch (err: any) { toast.error(err.message, { id: "dep" }); }
+                  }} className="text-[10px] font-bold uppercase tracking-wide bg-emerald-50 text-emerald-700 px-3 py-2 rounded-full hover:bg-emerald-100 transition flex items-center">
+                    <ShieldCheck className="w-3 h-3 mr-1" /> Cauzione
+                  </button>
+                  <button onClick={async () => {
+                    toast.loading("Invio email...", { id: "res" });
+                    const res = await fetch(`/api/bookings/${id}/resend`, { method: "POST" });
+                    if (res.ok) toast.success("Email inviata!", { id: "res" });
+                    else { const d = await res.json().catch(() => ({})); toast.error(d.error || "Errore", { id: "res" }); }
+                  }} className="text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 px-3 py-2 rounded-full hover:bg-blue-100 transition flex items-center">
+                    <Send className="w-3 h-3 mr-1" /> Re-invia
+                  </button>
+                </div>
+              )}
+              <select
                value={booking.status}
                onChange={(e) => handleStatusChange(e.target.value)}
                className="font-bold text-sm bg-white border border-gray-300 rounded-lg p-2.5 shadow-sm outline-none focus:ring-2 focus:ring-blue-500"
@@ -414,7 +447,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                                <div className="flex justify-between items-start">
                                   <div>
                                      <p className="font-bold text-gray-800 text-sm mb-1">{g.last_name} {g.first_name} <span className="text-gray-400 font-normal">({g.gender})</span></p>
-                                     <p className="text-gray-500">Nato il: {g.birth_date} • Residenza: {g.residence_city || g.residence_country}</p>
+                                     <p className="text-gray-500">Nato il: {formatDateStr(g.birth_date)} • Residenza: {g.residence_city || g.residence_country}</p>
                                      {(g.document_front_url || g.document_back_url) && (
                                         <div className="mt-2 flex gap-2">
                                            {g.document_front_url && <a href={g.document_front_url} target="_blank" className="text-blue-600 font-bold hover:underline">Fronte C.I.</a>}
@@ -423,7 +456,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                                      )}
                                   </div>
                                   <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                     <a href={`/guest/${id}/checkin?edit=${g.id}`} target="_blank" className="bg-white border rounded p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 shadow-sm" title="Modifica Ospite">
+                                     <a href={`/guest/${id}/checkin?edit=${g.id}`} className="bg-white border rounded p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 shadow-sm" title="Modifica Ospite">
                                         <Edit3 className="w-3.5 h-3.5" />
                                      </a>
                                      <button onClick={() => handleDeleteGuest(g.id)} className="bg-white border rounded p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 shadow-sm" title="Elimina Ospite">

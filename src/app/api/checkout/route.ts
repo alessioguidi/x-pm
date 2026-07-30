@@ -10,7 +10,8 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
-    
+    const hidePrices = payload.hide_prices === true;
+
     // Recupero info della Property
     const { data: prop } = await supabase.from('properties')
       .select('name, default_checkin_staff_id, default_checkout_staff_id, default_cleaning_staff_id, security_deposit, deposit_percentage, cleaning_fee, pet_fee, city_tax_per_night, city_tax_max_nights, city_tax_child_age, extra_services')
@@ -28,18 +29,15 @@ export async function POST(request: Request) {
     const petFee = petsCount * (prop?.pet_fee ?? 0);
     const maxN = (prop as any)?.city_tax_max_nights ?? 10;
     const taxableNights = Math.min(nights, maxN);
-    // city_tax è separata (cash in loco) — NON nel totalPrice del soggiorno
     const cityTax = payload.city_tax !== undefined 
       ? payload.city_tax 
       : (prop?.city_tax_per_night ?? 2) * taxableNights * adults;
     const extraTotal = (payload.extra_services || []).reduce((acc: number, e: any) => acc + Number(e.total || 0), 0);
-    // totalPrice = soggiorno base (senza city tax)
     const totalPrice = payload.total_price || (basePrice + cleaningFee + petFee + extraTotal);
     const depositPct = prop?.deposit_percentage ?? 0;
     const downPayment = depositPct > 0 ? Math.round(totalPrice * depositPct / 100 * 100) / 100 : 0;
     const securityDeposit = prop?.security_deposit ?? 0;
 
-    // Calcolo costi agenzia (services_cost e staff_cost)
     const propServices = prop?.extra_services || [];
     const servicesCost = (payload.extra_services || []).reduce((acc: number, e: any) => {
         const matched = propServices.find((ps: any) => ps.name === e.name);
@@ -57,7 +55,6 @@ export async function POST(request: Request) {
        }
     }
 
-    // Calcolo commissioni portale (usa canale "Sito Web" default se presente)
     let channelId = payload.channel_id || null;
     let commissionAmount = 0;
     let taxAmount = 0;
@@ -99,8 +96,8 @@ export async function POST(request: Request) {
         security_deposit: securityDeposit,
         down_payment: downPayment,
         total_price: totalPrice,
-        payment_method: payload.payment_method || "Contante",
-        status: payload.status || 'pending',
+        payment_method: hidePrices ? '' : (payload.payment_method || "Contante"),
+        status: 'pending',
         notes: payload.notes,
         extra_services: payload.extra_services || [],
         channel_id: channelId,
@@ -114,84 +111,10 @@ export async function POST(request: Request) {
       })
       .select()
       .single();
-      
+
     if (errBooking) {
       console.error("Booking Error:", errBooking);
       return NextResponse.json({ error: 'Errore DB: ' + errBooking.message }, { status: 500 });
-    }
-
-    // Auto-generate pagamenti pianificati
-    if (booking && (booking as any).id) {
-      const bId = (booking as any).id;
-      const contactId = payload.contact_id || null;
-      const checkInDate = payload.check_in_date;
-
-      const scheduledPayments = [];
-      
-      // Caparra: da versare anticipatamente (Bonifico), due_date non è check-in
-      if (downPayment > 0) {
-        scheduledPayments.push({
-          booking_id: bId, amount: downPayment, status: 'scheduled',
-          payment_method: 'Bonifico',
-          reason: 'Caparra',
-          notes: `Caparra (${depositPct}%) — da versare anticipatamente`
-        });
-      }
-
-      // Saldo: 2 giorni prima del check-in, Bonifico
-      const saldo = totalPrice - downPayment;
-      if (saldo > 0) {
-        const dueDate = new Date(checkInDate);
-        dueDate.setDate(dueDate.getDate() - 2);
-        scheduledPayments.push({
-          booking_id: bId, amount: saldo, status: 'scheduled',
-          payment_method: 'Bonifico',
-          reason: 'Saldo',
-          date: dueDate.toISOString().split('T')[0],
-          notes: `Saldo soggiorno — da versare entro il ${dueDate.toISOString().split('T')[0].split('-').reverse().join('/')}`
-        });
-      }
-
-      // Cauzione: cash all'arrivo → due_date = check_in
-      if (securityDeposit > 0) {
-        scheduledPayments.push({
-          booking_id: bId, amount: securityDeposit, status: 'scheduled',
-          payment_method: 'Contante',
-          reason: 'Cauzione Danni',
-          date: checkInDate,
-          staff_member_id: prop?.default_checkin_staff_id || null,
-          notes: "Cauzione danni — cash all'arrivo, restituita al check-out"
-        });
-      }
-
-      // Tassa di soggiorno: cash all'arrivo → due_date = check_in
-      if (cityTax > 0) {
-        scheduledPayments.push({
-          booking_id: bId, amount: cityTax, status: 'scheduled',
-          payment_method: 'Contante',
-          reason: 'Tassa Soggiorno',
-          date: checkInDate,
-          staff_member_id: prop?.default_checkin_staff_id || null,
-          notes: `Tassa di soggiorno (${adults} adulti × ${taxableNights} notti) — cash all'arrivo`
-        });
-      }
-
-      if (scheduledPayments.length > 0) {
-        const cashTxs = scheduledPayments.map(p => ({
-            organization_id: payload.organization_id || null,
-            property_id: payload.property_id || null,
-            booking_id: p.booking_id,
-            staff_member_id: p.staff_member_id || null,
-            amount: p.amount,
-            transaction_type: p.reason === 'Caparra' ? 'deposit_collection' : p.reason === 'Saldo' ? 'stay_balance' : 'stay_balance',
-            status: p.status,
-            payment_method: p.payment_method,
-            reason: p.reason,
-            notes: p.notes,
-            created_at: p.date ? new Date(p.date).toISOString() : new Date().toISOString()
-        }));
-        await supabase.from('cash_transactions').insert(cashTxs);
-      }
     }
 
     // Email al cliente
@@ -206,50 +129,91 @@ export async function POST(request: Request) {
          const transporter = nodemailer.createTransport({
            host: org.smtp_host, port: org.smtp_port || 465,
            secure: org.smtp_port === 465,
-           auth: { user: org.smtp_user, pass: org.smtp_pass }
+           auth: { user: org.smtp_user, pass: org.smtp_pass },
+           tls: { rejectUnauthorized: false }
          });
 
-         let htmlContent = org.booking_email_template;
-         if (!htmlContent) {
-           const extraHtml = (payload.extra_services || []).length > 0
-             ? `<h3>Servizi Extra:</h3><ul>${payload.extra_services.map((ex: any) => `<li><b>${ex.name}</b> x${ex.qty}: €${ex.total}</li>`).join('')}</ul>`
-             : '';
-           htmlContent = `
-             <h1>Prenotazione Ricevuta!</h1>
-             <p>Ciao {{guest_name}},</p>
-             <p>La tua richiesta per <b>${prop?.name}</b> dal <b>{{check_in_date}}</b> al <b>{{check_out_date}}</b> è stata ricevuta.</p>
-             ${extraHtml}
-             <div style="background:#f9fafb;padding:15px;border-radius:8px;margin-top:20px;">
-               <p>Totale Soggiorno: <b>€${totalPrice}</b></p>
-               ${cityTax > 0 ? `<p style="color:#b45309;">Tassa di soggiorno (${adults} adulti × ${taxableNights} notti): <b>€${cityTax}</b> — contanti in loco</p>` : ''}
-               ${downPayment > 0 ? `<p style="color:#b45309;">Caparra (${prop?.deposit_percentage}%): <b>€${downPayment}</b> — da versare anticipatamente</p>` : ''}
-               ${securityDeposit > 0 ? `<p style="color:#b91c1c;">Cauzione danni: <b>€${securityDeposit}</b> — contanti all'arrivo</p>` : ''}
-             </div>
-             <br/><p>Saluti,<br/>Lo staff di {{org_name}}</p>
+         if (hidePrices) {
+           // Email richiesta (senza prezzi) al cliente
+           const guestEmailHtml = `
+             <h1>Richiesta di Prenotazione Ricevuta</h1>
+             <p>Ciao ${payload.guest_name},</p>
+             <p>Grazie per aver inviato la tua richiesta di prenotazione per <b>${prop?.name}</b> dal <b>${payload.check_in_date?.split('-').reverse().join('/')}</b> al <b>${payload.check_out_date?.split('-').reverse().join('/')}</b>.</p>
+             ${payload.notes ? `<p>Il tuo messaggio: <i>${payload.notes}</i></p>` : ''}
+             <p>Ti contatteremo al più presto per confermare la disponibilità e fornirti tutti i dettagli.</p>
+             <br/><p>Saluti,<br/>Lo staff di ${org.name}</p>
            `;
-         }
-         htmlContent = htmlContent
-           .replace(/{{guest_name}}/g, payload.guest_name || '')
-           .replace(/{{check_in_date}}/g, payload.check_in_date?.split('-').reverse().join('/') || '')
-           .replace(/{{check_out_date}}/g, payload.check_out_date?.split('-').reverse().join('/') || '')
-           .replace(/{{total_price}}/g, String(totalPrice))
-           .replace(/{{org_name}}/g, org.name);
+           await transporter.sendMail({
+             from: `"${org.name}" <${org.smtp_from_email}>`,
+             to: payload.guest_email,
+             subject: `Richiesta di Prenotazione - ${org.name}`,
+             html: guestEmailHtml
+           });
 
-         await transporter.sendMail({
-           from: `"${org.name}" <${org.smtp_from_email}>`,
-           to: payload.guest_email,
-           subject: `Conferma Prenotazione - ${org.name}`,
-           html: htmlContent
-         });
+           // Email notifica all'amministratore
+           const adminEmailHtml = `
+             <h1>Nuova Richiesta di Prenotazione</h1>
+             <p><b>Struttura:</b> ${prop?.name}</p>
+             <p><b>Cliente:</b> ${payload.guest_name}</p>
+             <p><b>Email:</b> ${payload.guest_email}</p>
+             <p><b>Telefono:</b> ${payload.guest_phone}</p>
+             <p><b>Check-in:</b> ${payload.check_in_date?.split('-').reverse().join('/')}</p>
+             <p><b>Check-out:</b> ${payload.check_out_date?.split('-').reverse().join('/')}</p>
+             <p><b>Notti:</b> ${nights}</p>
+             <p><b>Ospiti:</b> ${adults} adulti${children > 0 ? ` + ${children} bambini` : ''}${petsCount > 0 ? ` + ${petsCount} animale/i` : ''}</p>
+             ${payload.notes ? `<p><b>Note cliente:</b><br/><i>${payload.notes}</i></p>` : ''}
+             <br/><p>Accedi al pannello di amministrazione per gestire la richiesta.</p>
+           `;
+           await transporter.sendMail({
+             from: `"${org.name}" <${org.smtp_from_email}>`,
+             to: org.smtp_from_email,
+             subject: `Nuova Richiesta Prenotazione - ${prop?.name}`,
+             html: adminEmailHtml
+           });
+         } else {
+           // Email standard di conferma
+           let htmlContent = org.booking_email_template;
+           if (!htmlContent) {
+             const extraHtml = (payload.extra_services || []).length > 0
+               ? `<h3>Servizi Extra:</h3><ul>${payload.extra_services.map((ex: any) => `<li><b>${ex.name}</b> x${ex.qty}: €${ex.total}</li>`).join('')}</ul>`
+               : '';
+             htmlContent = `
+               <h1>Prenotazione Ricevuta!</h1>
+               <p>Ciao {{guest_name}},</p>
+               <p>La tua richiesta per <b>${prop?.name}</b> dal <b>{{check_in_date}}</b> al <b>{{check_out_date}}</b> è stata ricevuta.</p>
+               ${extraHtml}
+               <div style="background:#f9fafb;padding:15px;border-radius:8px;margin-top:20px;">
+                 <p>Totale Soggiorno: <b>€${totalPrice}</b></p>
+                 ${cityTax > 0 ? `<p style="color:#b45309;">Tassa di soggiorno (${adults} adulti × ${taxableNights} notti): <b>€${cityTax}</b> — contanti in loco</p>` : ''}
+                 ${downPayment > 0 ? `<p style="color:#b45309;">Caparra (${prop?.deposit_percentage}%): <b>€${downPayment}</b> — da versare anticipatamente</p>` : ''}
+                 ${securityDeposit > 0 ? `<p style="color:#b91c1c;">Cauzione danni: <b>€${securityDeposit}</b> — contanti all'arrivo</p>` : ''}
+               </div>
+               <br/><p>Saluti,<br/>Lo staff di {{org_name}}</p>
+             `;
+           }
+           htmlContent = htmlContent
+             .replace(/{{guest_name}}/g, payload.guest_name || '')
+             .replace(/{{check_in_date}}/g, payload.check_in_date?.split('-').reverse().join('/') || '')
+             .replace(/{{check_out_date}}/g, payload.check_out_date?.split('-').reverse().join('/') || '')
+             .replace(/{{total_price}}/g, String(totalPrice))
+             .replace(/{{org_name}}/g, org.name);
+
+           await transporter.sendMail({
+             from: `"${org.name}" <${org.smtp_from_email}>`,
+             to: payload.guest_email,
+             subject: `Conferma Prenotazione - ${org.name}`,
+             html: htmlContent
+           });
+         }
        } catch (mailError) {
          console.error("Errore Invio Email:", mailError);
        }
     } else {
-      console.log(`\n[SIMULATORE SMTP] → ${payload.guest_email} | Totale: €${totalPrice} | City Tax: €${cityTax} | Caparra: €${downPayment}`);
+      console.log(`\n[SIMULATORE SMTP] → ${payload.guest_email} | hidePrices: ${hidePrices}`);
     }
 
     return NextResponse.json({ success: true, booking });
-    
+
   } catch (error: any) {
     console.error("API Checkout Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
