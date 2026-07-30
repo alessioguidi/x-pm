@@ -6,15 +6,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { TrendingUp, FileText } from "lucide-react";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/format";
 
-export default function PerformanceWidget() {
+export default function PerformanceWidget({ propertyIds = [] }: { propertyIds?: string[] }) {
   const [chartData, setChartData] = useState<any[]>([]);
-  const [properties, setProperties] = useState<any[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<string>("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchPerformanceData();
-  }, [selectedProperty]);
+  }, [propertyIds]);
 
   const fetchPerformanceData = async () => {
     setLoading(true);
@@ -23,22 +21,12 @@ export default function PerformanceWidget() {
     const currentYearStr = today.getFullYear().toString();
     const prevYearStr = (today.getFullYear() - 1).toString();
 
-    // Fetch Properties for dropdown
-    if (properties.length === 0) {
-        const { data: propsData } = await supabase.from('properties').select('id, name').order('name');
-        if (propsData) setProperties(propsData);
-    }
-
-    // Prepare filter arrays
-    let propertyIdsToFilter: string[] = [];
-    if (selectedProperty === 'all' && properties.length > 0) {
-       propertyIdsToFilter = properties.map(p => p.id);
-    } else if (selectedProperty !== 'all') {
-       propertyIdsToFilter = [selectedProperty];
+    let propertyIdsToFilter: string[];
+    if (propertyIds.length > 0) {
+       propertyIdsToFilter = propertyIds;
     } else {
-       // if properties are loaded for the first time
-       const { data: fallbackProps } = await supabase.from('properties').select('id');
-       propertyIdsToFilter = (fallbackProps || []).map(p => p.id);
+       const { data: allProps } = await supabase.from('properties').select('id');
+       propertyIdsToFilter = (allProps || []).map(p => p.id);
     }
 
     // Fetch Bookings (Income)
@@ -132,16 +120,8 @@ export default function PerformanceWidget() {
                     <TrendingUp className="w-5 h-5 text-blue-600" /> Rendiconto Economico Mensile
                  </h3>
                  <p className="text-xs text-gray-400 font-medium">Utile pre-imposte: Incassi - Costi Contabili</p>
-             </div>
-             <select 
-                value={selectedProperty} 
-                onChange={(e) => setSelectedProperty(e.target.value)}
-                className="text-sm p-2 border border-gray-200 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 max-w-[200px]"
-             >
-                <option value="all">Tutte le Strutture</option>
-                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-             </select>
-         </div>
+              </div>
+          </div>
 
          {loading ? (
              <div className="flex-1 flex justify-center items-center"><div className="w-8 h-8 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin"></div></div>

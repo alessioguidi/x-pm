@@ -14,7 +14,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
 
   try {
-    const { status, checkin_staff_id, checkout_staff_id, cleaning_staff_id, requires_linens, staff_notes, deposit_amount, deposit_date, deposit_paid, payment_method, security_deposit_amount } = await req.json();
+    const { status, checkin_staff_id, checkout_staff_id, cleaning_staff_id, requires_linens, staff_notes, deposit_amount, deposit_date, deposit_paid, payment_method, security_deposit_amount, check_in_date, check_out_date } = await req.json();
 
     // Verify session
     const { data: { user } } = await supabase.auth.getUser();
@@ -45,6 +45,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (deposit_paid !== undefined) payload.deposit_paid = deposit_paid;
     if (payment_method !== undefined) payload.payment_method = payment_method;
     if (security_deposit_amount !== undefined) payload.security_deposit_amount = security_deposit_amount;
+    if (check_in_date !== undefined) payload.check_in_date = check_in_date;
+    if (check_out_date !== undefined) payload.check_out_date = check_out_date;
 
     const { error: upError } = await supabase
       .from('bookings')
@@ -133,6 +135,43 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // AUTOMAZIONE INCASSI SU STAFF TASK E CASH LEDGER
     if (status === 'confirmed' && oldStatus !== 'confirmed') {
        console.log("[AUTOMATION] Generazione task e ledger per operatore check-in...");
+
+       // Notifica check-in (1 giorno prima)
+       const checkInDate = new Date(booking.check_in_date);
+       const checkInLinkDate = new Date(checkInDate);
+       checkInLinkDate.setDate(checkInLinkDate.getDate() - 1);
+       try {
+          await supabase.from('tasks').insert({
+             organization_id: org.id, property_id: booking.property_id,
+             staff_member_id: null, task_date: checkInLinkDate.toISOString().split('T')[0],
+             task_type: 'send_checkin_link',
+             notes: `Inviare link check-in al cliente ${booking.guest_name} per ${booking.properties?.name} (check-in: ${booking.check_in_date})`
+          });
+       } catch(e) { console.error("Error creating checkin link task", e); }
+
+       // Notifica cauzione (se metodo Stripe)
+       const { data: prop } = await supabase.from('properties').select('deposit_method').eq('id', booking.property_id).single();
+       if (prop?.deposit_method === 'stripe') {
+          try {
+             await supabase.from('tasks').insert({
+                organization_id: org.id, property_id: booking.property_id,
+                staff_member_id: null, task_date: booking.check_in_date,
+                task_type: 'send_deposit_link',
+                notes: `Inviare link pagamento cauzione Stripe al cliente ${booking.guest_name}`
+             });
+          } catch(e) { console.error("Error creating deposit link task", e); }
+       }
+
+       // Notifica check-out
+       try {
+          await supabase.from('tasks').insert({
+             organization_id: org.id, property_id: booking.property_id,
+             staff_member_id: null, task_date: booking.check_out_date,
+             task_type: 'send_checkout_link',
+             notes: `Inviare link check-out al cliente ${booking.guest_name} per ${booking.properties?.name}`
+          });
+       } catch(e) { console.error("Error creating checkout link task", e); }
+
        const balance = Number(booking.total_price) - (Number(booking.deposit_amount) || 0);
        const depositReq = Number(booking.security_deposit_amount) || 0;
        const payMethod = payment_method || booking.payment_method || 'Contante all\'arrivo';
@@ -196,10 +235,38 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
            }
        } catch (e) {
            console.error("Error creating scheduled payments on confirm", e);
-       }
-    }
+        }
+     }
 
-    return NextResponse.json({ success: true });
+     // Ricrea task notifica se le date cambiano
+     const datesChanged = (check_in_date && check_in_date !== booking.check_in_date) || (check_out_date && check_out_date !== booking.check_out_date);
+     if (datesChanged) {
+        const effectiveIn = check_in_date || booking.check_in_date;
+        const effectiveOut = check_out_date || booking.check_out_date;
+        // Elimina vecchi task notifica
+        await supabase.from('tasks').delete().eq('property_id', booking.property_id).in('task_type', ['send_checkin_link', 'send_deposit_link', 'send_checkout_link']).gte('task_date', booking.check_in_date);
+        // Crea nuovi task
+        const linkDate = new Date(effectiveIn);
+        linkDate.setDate(linkDate.getDate() - 1);
+        try {
+           await supabase.from('tasks').insert({
+              organization_id: org.id, property_id: booking.property_id,
+              staff_member_id: null, task_date: linkDate.toISOString().split('T')[0],
+              task_type: 'send_checkin_link',
+              notes: `Inviare link check-in al cliente ${booking.guest_name} per ${booking.properties?.name} (check-in: ${effectiveIn})`
+           });
+        } catch(e) { console.error("Error creating checkin link task", e); }
+        try {
+           await supabase.from('tasks').insert({
+              organization_id: org.id, property_id: booking.property_id,
+              staff_member_id: null, task_date: effectiveOut,
+              task_type: 'send_checkout_link',
+              notes: `Inviare link check-out al cliente ${booking.guest_name} per ${booking.properties?.name}`
+           });
+        } catch(e) { console.error("Error creating checkout link task", e); }
+     }
+
+     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("Booking Update Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

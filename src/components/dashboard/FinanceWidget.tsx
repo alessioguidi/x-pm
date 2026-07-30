@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, Euro, X, Percent, Briefcase, Wifi, Receipt, R
 import toast from "react-hot-toast";
 import { formatCurrency, formatPercent } from "@/lib/format";
 
-export default function FinanceWidget() {
+export default function FinanceWidget({ propertyIds = [] }: { propertyIds?: string[] }) {
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [costModal, setCostModal] = useState<any>(null);
@@ -15,7 +15,7 @@ export default function FinanceWidget() {
 
   useEffect(() => {
     fetchMetrics();
-  }, []);
+  }, [propertyIds]);
 
   const fetchMetrics = async () => {
     setLoading(true);
@@ -23,8 +23,10 @@ export default function FinanceWidget() {
     const today = new Date();
     const currentYear = today.getFullYear();
 
-    const { data: bookings } = await supabase.from('bookings').select('*')
+    let query = supabase.from('bookings').select('*')
       .gte('check_in_date', `${currentYear - 1}-01-01`);
+    if (propertyIds.length > 0) query = query.in('property_id', propertyIds);
+    const { data: bookings } = await query;
 
     const ytdCurrent = bookings?.filter(b => b.check_in_date.startsWith(currentYear.toString())) || [];
     const ytdPrev = bookings?.filter(b => b.check_in_date.startsWith((currentYear - 1).toString())) || [];

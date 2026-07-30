@@ -6,25 +6,27 @@ import { PlaneLanding, MapPin, CalendarDays, ExternalLink, User } from "lucide-r
 import { formatDateStr, formatCurrency } from "@/lib/format";
 import Link from "next/link";
 
-export default function UpcomingArrivalsWidget() {
+export default function UpcomingArrivalsWidget({ propertyIds = [] }: { propertyIds?: string[] }) {
   const [arrivals, setArrivals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchArrivals();
-  }, []);
+  }, [propertyIds]);
 
   const fetchArrivals = async () => {
     setLoading(true);
 
     const todayISO = new Date().toISOString().split('T')[0];
     
-    const { data } = await supabase.from('bookings')
+    let query = supabase.from('bookings')
        .select('id, check_in_date, check_out_date, adults_count, children_count, status, properties(name), contacts(first_name, last_name)')
        .in('status', ['confirmed', 'deposit_paid', 'pending'])
        .gte('check_in_date', todayISO)
        .order('check_in_date', { ascending: true })
        .limit(5);
+    if (propertyIds.length > 0) query = query.in('property_id', propertyIds);
+    const { data } = await query;
 
     setArrivals(data || []);
     setLoading(false);

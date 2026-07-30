@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/utils/supabase/client";
-import { Loader2, LayoutGrid, Settings2, GripHorizontal, Eye, EyeOff } from "lucide-react";
+import { Loader2, LayoutGrid, Settings2, GripHorizontal, Eye, EyeOff, Building2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   DndContext,
@@ -36,7 +36,7 @@ const DEFAULT_LAYOUT = [
   { id: 'performance', component: PerformanceWidget, visible: true, size: 'col-span-12' },
 ];
 
-function SortableWidget({ id, widgetEntry, isEditing, toggleVisibility, changeSize }: any) {
+function SortableWidget({ id, widgetEntry, isEditing, toggleVisibility, changeSize, propertyIds }: any) {
   const {
     attributes,
     listeners,
@@ -86,7 +86,7 @@ function SortableWidget({ id, widgetEntry, isEditing, toggleVisibility, changeSi
         </div>
       )}
       <div className="flex-1 overflow-auto pointer-events-auto">
-        <Component />
+        <Component propertyIds={propertyIds} />
       </div>
     </div>
   );
@@ -98,6 +98,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [orgId, setOrgId] = useState('');
+  const [properties, setProperties] = useState<any[]>([]);
+  const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -107,6 +109,20 @@ export default function DashboardPage() {
   useEffect(() => {
     loadLayout();
   }, []);
+
+  useEffect(() => {
+    if (orgId) {
+      supabase.from('properties').select('id, name').eq('organization_id', orgId).order('name').then(({ data }) => {
+        if (data) setProperties(data);
+      });
+    }
+  }, [orgId]);
+
+  const toggleProperty = (id: string) => {
+    setSelectedPropertyIds(prev =>
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
+  };
 
   const loadLayout = async () => {
     setLoading(true);
@@ -189,7 +205,7 @@ export default function DashboardPage() {
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-        <div>
+        <div className="flex-1">
            <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
              <LayoutGrid className="w-8 h-8 text-blue-600" />
              Dashboard CRM
@@ -197,13 +213,45 @@ export default function DashboardPage() {
            <p className="text-gray-500 mt-1">Panoramica completa in tempo reale sulle performance e attività.</p>
         </div>
         
-        <button 
-           onClick={() => setIsEditing(!isEditing)}
-           className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all shadow-sm ${isEditing ? 'bg-blue-600 text-white shadow-blue-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-        >
-           <Settings2 className="w-5 h-5" />
-           {isEditing ? 'Fine Modifica Layout' : 'Gestisci Layout Wiidget'}
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Filtro strutture */}
+          <div className="relative group">
+            <button className="flex items-center gap-2 px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-700 hover:border-blue-300 transition-all shadow-sm">
+              <Building2 className="w-4 h-4" />
+              {selectedPropertyIds.length === 0 || selectedPropertyIds.length === properties.length
+                ? 'Tutte le strutture'
+                : `${selectedPropertyIds.length} strutture`}
+            </button>
+            <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-2 min-w-[240px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+              <button
+                onClick={() => setSelectedPropertyIds(selectedPropertyIds.length === properties.length ? [] : properties.map(p => p.id))}
+                className="w-full text-left px-3 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                {selectedPropertyIds.length === properties.length ? 'Deseleziona tutte' : 'Seleziona tutte'}
+              </button>
+              <div className="border-t my-1" />
+              {properties.map(p => (
+                <label key={p.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={selectedPropertyIds.includes(p.id)}
+                    onChange={() => toggleProperty(p.id)}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{p.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <button 
+             onClick={() => setIsEditing(!isEditing)}
+             className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all shadow-sm ${isEditing ? 'bg-blue-600 text-white shadow-blue-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+             <Settings2 className="w-5 h-5" />
+             {isEditing ? 'Fine Modifica Layout' : 'Gestisci Layout Wiidget'}
+          </button>
+        </div>
       </div>
 
       {isEditing && (
@@ -224,6 +272,7 @@ export default function DashboardPage() {
                      isEditing={isEditing} 
                      toggleVisibility={toggleVisibility}
                      changeSize={changeSize}
+                     propertyIds={selectedPropertyIds}
                   />
               ))}
             </SortableContext>

@@ -106,6 +106,13 @@ export default function TasksPage() {
        .gte('scheduled_date', monthStartStr)
        .lte('scheduled_date', monthEndStr);
 
+    // Fetch notification tasks from tasks table
+    const { data: notificationTasks } = await supabase.from('tasks')
+       .select('*, properties(id, name)')
+       .in('task_type', ['send_checkin_link', 'send_deposit_link', 'send_checkout_link'])
+       .gte('task_date', monthStartStr)
+       .lte('task_date', monthEndStr);
+
     const persistedVirtualIds = new Set(dbTasks?.map(t => t.virtual_id_reference).filter(Boolean));
 
     // Fetch Bookings for Virtual Tasks
@@ -170,6 +177,29 @@ export default function TasksPage() {
       addVirtual(`${b.id}-in`, b.check_in_date, 'Check-in', c_in);
       addVirtual(`${b.id}-out`, b.check_out_date, 'Check-out', c_out);
       addVirtual(`${b.id}-clean`, b.check_out_date, 'Pulizie', c_clean);
+    });
+
+    // Parse notification tasks
+    const notificationTypeMap: Record<string, string> = {
+       send_checkin_link: 'Invio Link Check-in',
+       send_deposit_link: 'Invio Link Cauzione',
+       send_checkout_link: 'Invio Link Check-out',
+    };
+    notificationTasks?.forEach(nt => {
+       const typeLabel = notificationTypeMap[nt.task_type] || nt.task_type;
+       allTasks.push({
+         id: nt.id,
+         isVirtual: false,
+         type: typeLabel,
+         color: 'bg-violet-100 text-violet-800 border-violet-300',
+         date: nt.task_date,
+         staff_id: nt.staff_member_id,
+         staff_name: nt.staff_member_id ? staffMap.get(nt.staff_member_id) : null,
+         property: nt.properties || null,
+         booking: null,
+         status: nt.status,
+         notes: nt.notes,
+       });
     });
 
     setTasks(allTasks);

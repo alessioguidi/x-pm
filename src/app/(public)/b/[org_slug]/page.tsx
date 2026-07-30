@@ -2,6 +2,7 @@ import { supabase } from "@/utils/supabase/client";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MapPin, Users, Bed, ChevronRight } from "lucide-react";
+import CoverCarousel from "@/components/public/CoverCarousel";
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,7 @@ export default async function PublicOrganizationPage({ params }: { params: Promi
   const resolvedParams = await params;
   const orgSlug = resolvedParams.org_slug;
 
-  const { data: org } = await supabase.from('organizations').select('id, name, theme_color').eq('slug', orgSlug).single();
+  const { data: org } = await supabase.from('organizations').select('id, name, theme_color, cover_photos').eq('slug', orgSlug).single();
   if (!org) notFound();
 
   // Omette le strutture nascoste is_active = false
@@ -22,9 +23,14 @@ export default async function PublicOrganizationPage({ params }: { params: Promi
   const today = new Date().toISOString().split('T')[0];
   const propertyIds = properties?.map(p => p.id) || [];
   
-  // Copertina: prima foto disponibile tra tutte le proprietà
-  const coverPhoto = properties?.reduce<string | null>((found, p) => found || p.property_photos?.[0]?.image_url || null, null);
-  
+  // Cover photos: org cover_photos, fallback to first property photo
+  const coverPhotos = (org.cover_photos && org.cover_photos.length > 0)
+    ? org.cover_photos
+    : (() => {
+        const first = properties?.reduce<string | null>((found, p) => found || p.property_photos?.[0]?.image_url || null, null);
+        return first ? [first] : [];
+      })();
+
   let minimumPrices: Record<string, number> = {};
   if (propertyIds.length > 0) {
      const { data: calData } = await supabase.from('calendar')
@@ -46,22 +52,8 @@ export default async function PublicOrganizationPage({ params }: { params: Promi
 
   return (
     <div className="animate-in fade-in duration-700">
-      {/* Hero Section */}
-      <div className="relative h-[450px] w-full flex items-center justify-center overflow-hidden bg-gray-900 border-b border-gray-200">
-        <div className="absolute inset-0 opacity-50 mix-blend-multiply" style={{ backgroundColor: org.theme_color || '#2563eb' }} />
-        {coverPhoto && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={coverPhoto} alt="Cover" className="absolute inset-0 w-full h-full object-cover opacity-50" />
-        )}
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto mt-10">
-          <h1 className="text-5xl md:text-7xl font-extrabold text-white tracking-tight drop-shadow-xl mb-6">
-            Benvenuti da {org.name}
-          </h1>
-          <p className="text-xl md:text-2xl text-gray-100 drop-shadow-md font-medium max-w-2xl mx-auto">
-            Esplora la nostra collezione di proprietà esclusive e prenota online il tuo prossimo soggiorno.
-          </p>
-        </div>
-      </div>
+      {/* Hero Carousel */}
+      <CoverCarousel images={coverPhotos} themeColor={org.theme_color} orgName={org.name} />
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">

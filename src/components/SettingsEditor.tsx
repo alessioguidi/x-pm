@@ -49,6 +49,7 @@ export default function SettingsEditor({ organization }: { organization: any }) 
     name: organization.name || "",
     description: organization.description || "",
     host_photo: organization.host_photo || "",
+    cover_photos: organization.cover_photos || [],
     smtp_host: organization.smtp_host || "",
     smtp_port: organization.smtp_port || 465,
     smtp_user: organization.smtp_user || "",
@@ -82,7 +83,8 @@ export default function SettingsEditor({ organization }: { organization: any }) 
         allowed_payment_methods: formData.allowed_payment_methods,
         number_format: formData.number_format,
         date_format: formData.date_format,
-        currency: formData.currency
+        currency: formData.currency,
+        cover_photos: formData.cover_photos
       })
       .eq('id', organization.id);
     
@@ -115,6 +117,33 @@ export default function SettingsEditor({ organization }: { organization: any }) 
       setFormData({ ...formData, host_photo: data.publicUrl });
       toast.success("Foto caricata! Ricordati di salvare.");
 
+    } catch (e) {
+      toast.error("Errore caricamento foto");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      if (!e.target.files || e.target.files.length === 0) return;
+      setUploading(true);
+      const files = Array.from(e.target.files);
+      const uploaded: string[] = [];
+
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `cover-${organization.slug}-${Math.random()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('property_images')
+          .upload(fileName, file);
+        if (uploadError) throw uploadError;
+        const { data } = supabase.storage.from('property_images').getPublicUrl(fileName);
+        uploaded.push(data.publicUrl);
+      }
+
+      setFormData({ ...formData, cover_photos: [...formData.cover_photos, ...uploaded] });
+      toast.success("Foto caricate! Ricordati di salvare.");
     } catch (e) {
       toast.error("Errore caricamento foto");
     } finally {
@@ -252,6 +281,42 @@ export default function SettingsEditor({ organization }: { organization: any }) 
                 <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={uploading}/>
               </label>
               <p className="text-xs text-gray-500 mt-2">Questa foto apparirà sulla Vetrina e nelle singole stanze.</p>
+            </div>
+          </div>
+        </div>
+
+        <hr className="border-gray-100" />
+
+        {/* Cover Photos */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 flex items-center mb-4">
+            <Camera className="w-5 h-5 mr-2 text-blue-600"/>
+            Foto Copertina (Carosello Vetrina)
+          </h3>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">Le foto appariranno come carosello nella pagina pubblica della tua vetrina.</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {formData.cover_photos.map((url: string, i: number) => (
+                <div key={i} className="relative aspect-[16/9] rounded-xl overflow-hidden bg-gray-100 border border-gray-200 group">
+                  <img src={url} alt={`Cover ${i + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, cover_photos: formData.cover_photos.filter((_: string, j: number) => j !== i) })}
+                    className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition shadow-lg hover:bg-red-600"
+                  >
+                    X
+                  </button>
+                </div>
+              ))}
+              <label className="aspect-[16/9] rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                {uploading ? <Loader2 className="w-6 h-6 animate-spin text-blue-600"/> : (
+                  <>
+                    <Camera className="w-6 h-6 text-gray-400" />
+                    <span className="text-xs text-gray-500 font-medium">Aggiungi</span>
+                  </>
+                )}
+                <input type="file" className="hidden" accept="image/*" multiple onChange={handleCoverUpload} disabled={uploading} />
+              </label>
             </div>
           </div>
         </div>

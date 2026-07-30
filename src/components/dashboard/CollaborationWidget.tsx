@@ -6,23 +6,25 @@ import { MessageSquare, Bell, Calendar as CalendarIcon } from "lucide-react";
 import { formatDateStr, formatCurrency } from "@/lib/format";
 import Link from "next/link";
 
-export default function CollaborationWidget() {
+export default function CollaborationWidget({ propertyIds = [] }: { propertyIds?: string[] }) {
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchNotes();
-  }, []);
+  }, [propertyIds]);
 
   const fetchNotes = async () => {
     setLoading(true);
 
-    const { data } = await supabase.from('bookings')
+    let query = supabase.from('bookings')
        .select('id, check_in_date, staff_notes, properties(name), contacts(first_name, last_name)')
        .not('staff_notes', 'is', null)
        .neq('staff_notes', '')
        .order('created_at', { ascending: false })
        .limit(8);
+    if (propertyIds.length > 0) query = query.in('property_id', propertyIds);
+    const { data } = await query;
 
     setNotes(data || []);
     setLoading(false);

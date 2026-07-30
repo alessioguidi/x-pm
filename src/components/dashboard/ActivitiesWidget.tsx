@@ -5,13 +5,13 @@ import { supabase } from "@/utils/supabase/client";
 import { TrendingUp, TrendingDown, CalendarDays, Home, BellRing, CheckSquare, Clock, Activity } from "lucide-react";
 import { formatPercent } from "@/lib/format";
 
-export default function ActivitiesWidget() {
+export default function ActivitiesWidget({ propertyIds = [] }: { propertyIds?: string[] }) {
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchMetrics();
-  }, []);
+  }, [propertyIds]);
 
   const fetchMetrics = async () => {
     setLoading(true);
@@ -20,8 +20,10 @@ export default function ActivitiesWidget() {
     const currentYear = today.getFullYear();
     const todayISO = today.toISOString().split('T')[0];
 
-    const { data: bookings } = await supabase.from('bookings').select('*')
+    let query = supabase.from('bookings').select('*')
       .gte('check_in_date', `${currentYear - 1}-01-01`);
+    if (propertyIds.length > 0) query = query.in('property_id', propertyIds);
+    const { data: bookings } = await query;
 
     const ytdCurrent = bookings?.filter(b => b.check_in_date.startsWith(currentYear.toString())) || [];
     const ytdPrev = bookings?.filter(b => b.check_in_date.startsWith((currentYear - 1).toString())) || [];
