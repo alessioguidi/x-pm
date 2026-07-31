@@ -276,9 +276,9 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
             </div>
              <h2 className="text-2xl font-bold text-gray-900 mb-2">Check-in Completato</h2>
               <p className="text-gray-500">Grazie per aver inserito i dati per tutti gli ospiti. Ti aspettiamo presso {booking.properties?.name}!</p>
-              {isAdmin && <a href={`/bookings/${bookingId}`} className="mt-6 inline-flex items-center gap-1 text-blue-600 font-bold hover:underline text-sm">
-                <ArrowLeft className="w-3.5 h-3.5" /> Torna alla prenotazione
-              </a>}
+              <a href={`/guest/${bookingId}`} className="mt-6 inline-flex items-center gap-1 text-blue-600 font-bold hover:underline text-sm">
+                <ArrowLeft className="w-3.5 h-3.5" /> Torna al portal
+              </a>
          </div>
       </div>
     );
@@ -290,11 +290,16 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="bg-gradient-to-r from-blue-700 to-blue-500 rounded-2xl p-6 mb-8 text-white shadow-lg relative overflow-hidden">
-          {isAdmin && (
-          <a href={`/bookings/${bookingId}`} className="inline-flex items-center gap-1 text-blue-200 hover:text-white text-xs font-bold mb-3 transition">
-            <ArrowLeft className="w-3.5 h-3.5" /> Torna alla prenotazione
-          </a>
-          )}
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <a href={`/guest/${bookingId}`} className="inline-flex items-center gap-1 text-blue-200 hover:text-white text-xs font-bold transition">
+              <ArrowLeft className="w-3.5 h-3.5" /> Torna al portal
+            </a>
+            {isAdmin && (
+            <a href={`/bookings/${bookingId}`} className="inline-flex items-center gap-1 text-blue-200 hover:text-white text-xs font-bold transition">
+              <ArrowLeft className="w-3.5 h-3.5" /> Vai alla prenotazione
+            </a>
+            )}
+          </div>
           <div className="relative z-10">
              <h1 className="text-2xl font-extrabold mb-1">Registrazione Ospiti</h1>
              <p className="text-blue-100 font-medium opacity-90"><MapPin className="inline w-4 h-4 mr-1"/> {booking.properties?.name}</p>

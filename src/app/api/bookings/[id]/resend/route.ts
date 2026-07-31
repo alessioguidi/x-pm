@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // 1. Dati prenotazione completi
     const { data: booking, error } = await supabase
       .from('bookings')
-      .select('*, organizations(name, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, booking_email_template), properties(name, deposit_percentage, security_deposit)')
+      .select('*, organizations(name, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, booking_email_template), properties(name, deposit_percentage, security_deposit, notification_emails)')
       .eq('id', bookingId)
       .single();
 
@@ -72,6 +72,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       `;
     }
 
+    const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
     // Parsing tag template anche per il Resend
      htmlContent = htmlContent
         .replace(/{{guest_name}}/g, booking.guest_name)
@@ -79,11 +80,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         .replace(/{{check_out_date}}/g, booking.check_out_date.split('-').reverse().join('/'))
         .replace(/{{total_price}}/g, booking.total_price)
         .replace(/{{org_name}}/g, org.name)
-        .replace(/{{property_name}}/g, prop?.name || 'la struttura');
+        .replace(/{{property_name}}/g, prop?.name || 'la struttura')
+        .replace(/{{portal_link}}/g, `${origin}/guest/${bookingId}`);
 
     await transporter.sendMail({
        from: `"${org.name}" <${org.smtp_from_email}>`,
        to: booking.guest_email,
+       cc: prop?.notification_emails?.length ? prop.notification_emails : undefined,
        subject: `Aggiornamento Prenotazione: ${prop?.name || org.name}`,
        html: htmlContent
     });

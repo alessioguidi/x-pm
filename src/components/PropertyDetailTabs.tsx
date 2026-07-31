@@ -7,6 +7,7 @@ import PropertyRulesEditor from "@/components/PropertyRulesEditor";
 import PropertyAmenitiesEditor from "@/components/PropertyAmenitiesEditor";
 import PropertyStaffEditor from "@/components/PropertyStaffEditor";
 import PropertyExtraServicesEditor from "@/components/PropertyExtraServicesEditor";
+import PropertyGuideEditor from "@/components/PropertyGuideEditor";
 
 export default function PropertyDetailTabs({ property }: { property: any }) {
   const [activeTab, setActiveTab] = useState('generale');
@@ -17,6 +18,7 @@ export default function PropertyDetailTabs({ property }: { property: any }) {
     { id: 'regole', label: 'Regole, Check-in e Check-out' },
     { id: 'extra', label: 'Servizi Extra' },
     { id: 'staff', label: 'Assegnazione Staff' },
+    { id: 'guida', label: 'Guida Ospite' },
     { id: 'foto', label: 'Galleria' },
   ];
 
@@ -65,6 +67,11 @@ export default function PropertyDetailTabs({ property }: { property: any }) {
         {activeTab === 'staff' && (
           <div className="max-w-4xl">
              <PropertyStaffEditor property={property} />
+          </div>
+        )}
+        {activeTab === 'guida' && (
+          <div className="max-w-4xl">
+             <PropertyGuideEditor property={property} />
           </div>
         )}
         {activeTab === 'foto' && (

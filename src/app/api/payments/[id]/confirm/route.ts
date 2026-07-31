@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // 1. Get payment details from cash_transactions
     const { data: payment, error: pErr } = await supabase
       .from('cash_transactions')
-      .select('*, bookings(*, properties(name), organizations(*))')
+      .select('*, bookings(*, properties(name, notification_emails), organizations(*))')
       .eq('id', id)
       .single();
 
@@ -53,6 +53,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             auth: { user: org.smtp_user, pass: org.smtp_pass }
           });
 
+          const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
+          const portalLink = `${origin}/guest/${booking.id}`;
           const htmlContent = (org as any).booking_email_template
             ? (org as any).booking_email_template
                 .replace(/{{guest_name}}/g, booking.guest_name || '')
@@ -60,11 +62,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 .replace(/{{check_out_date}}/g, booking.check_out_date?.split('-').reverse().join('/') || '')
                 .replace(/{{total_price}}/g, String(booking.total_price || 0))
                 .replace(/{{org_name}}/g, org.name)
+                .replace(/{{property_name}}/g, booking.properties?.name || '')
+                .replace(/{{portal_link}}/g, portalLink)
             : `<h1>Prenotazione Confermata!</h1><p>Ciao ${booking.guest_name},<br/>La tua prenotazione presso <b>${booking.properties?.name}</b> dal <b>${booking.check_in_date?.split('-').reverse().join('/')}</b> al <b>${booking.check_out_date?.split('-').reverse().join('/')}</b> è stata confermata.<br/><br/>Saluti,<br/>Lo staff di ${org.name}</p>`;
 
           await transporter.sendMail({
             from: `"${org.name}" <${org.smtp_from_email}>`,
             to: booking.guest_email,
+            cc: booking.properties?.notification_emails?.length ? booking.properties.notification_emails : undefined,
             subject: `Prenotazione Confermata - ${org.name}`,
             html: htmlContent
           });

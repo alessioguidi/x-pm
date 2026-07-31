@@ -21,7 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const { data: booking, error: bkError } = await supabase
       .from('bookings')
-      .select('*, properties(name), organizations(*)')
+      .select('*, properties(name, notification_emails), organizations(*)')
       .eq('id', id)
       .single();
 
@@ -105,6 +105,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
              await transporter.sendMail({
                  from: `"${org.name}" <${org.smtp_from_email || org.smtp_user}>`,
                  to: booking.guest_email,
+                 cc: booking.properties?.notification_emails?.length ? booking.properties.notification_emails : undefined,
                  subject: `Messaggio da ${booking.properties?.name}`,
                  text: content,
                  html: content.replace(/\n/g, '<br/>')

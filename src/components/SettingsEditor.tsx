@@ -406,7 +406,7 @@ export default function SettingsEditor({ organization }: { organization: any }) 
             <div className="pt-4 border-t border-gray-200 mt-6 space-y-6">
               <div>
                 <label className="block text-xs uppercase font-bold text-gray-700 mb-2">Modello Email: Ricezione / IN ATTESA (HTML consentito)</label>
-                <p className="text-xs text-gray-500 mb-2">Usa i segnaposto: {'{{guest_name}}, {{check_in_date}}, {{check_out_date}}, {{total_price}}, {{org_name}}, {{check_in_link}}'}. Viene mandata quando l'utente fa la richiesta prima dell'accettazione.</p>
+                <p className="text-xs text-gray-500 mb-2">Usa i segnaposto: {'{{guest_name}}, {{check_in_date}}, {{check_out_date}}, {{total_price}}, {{org_name}}, {{property_name}}, {{portal_link}}'}. {'{{portal_link}}'} è il link al portal ospite (prenotazione, regole, guida). Viene mandata quando l'utente fa la richiesta prima dell'accettazione.</p>
                 <textarea 
                   className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 font-mono h-32" 
                   value={formData.booking_email_template} 

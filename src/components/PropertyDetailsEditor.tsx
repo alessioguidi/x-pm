@@ -38,7 +38,20 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
     bedrooms: property.bedrooms || 1,
     max_guests: property.max_guests || 2,
     is_active: property.is_active || false,
+    notification_emails: Array.isArray(property.notification_emails) ? (property.notification_emails as string[]) : [],
   });
+
+  const [emailInput, setEmailInput] = useState("");
+
+  const addEmails = (raw: string) => {
+    const emails = raw.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
+    if (emails.length === 0) return;
+    setFormData(prev => ({
+      ...prev,
+      notification_emails: [...new Set([...prev.notification_emails, ...emails])],
+    }));
+    setEmailInput("");
+  };
 
   const toSlug = (text: string) =>
     text.toLowerCase()
@@ -214,6 +227,55 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
              <label className="text-xs font-bold text-gray-700">Prezzi e costi visibili sul form di prenotazione</label>
              <p className="text-[10px] text-gray-400">Se disabilitato, il form mostra solo disponibilità e richiesta dati cliente (senza prezzi)</p>
            </div>
+        </div>
+
+        <div className="pt-4 border-t mt-4 border-gray-100">
+          <h4 className="text-sm font-semibold mb-1 text-gray-900">Email Notifiche Prenotazioni</h4>
+          <p className="text-[11px] text-gray-500 mb-3 leading-tight">
+            Indirizzi in CC per tutte le email legate alle prenotazioni (conferme, annullamenti, richieste). In aggiunta all'email principale dell'account.
+          </p>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {formData.notification_emails.map((email, i) => (
+              <span key={`${email}-${i}`} className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 text-xs font-medium rounded-full pl-3 pr-1 py-1">
+                {email}
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, notification_emails: prev.notification_emails.filter((_, idx) => idx !== i) }))}
+                  className="text-blue-500 hover:text-blue-800 p-0.5 rounded-full hover:bg-blue-100"
+                  title="Rimuovi"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              multiple
+              placeholder="es. info@immobile.it, owner@immobile.it"
+              className="flex-1 border rounded p-2 text-sm text-gray-900 focus:ring-blue-500 outline-none"
+              value={emailInput}
+              onChange={e => setEmailInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ',') {
+                  e.preventDefault();
+                  addEmails(emailInput);
+                }
+              }}
+              onBlur={() => { if (emailInput.trim()) addEmails(emailInput); }}
+            />
+            <button
+              type="button"
+              onClick={() => addEmails(emailInput)}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded border border-gray-300 transition"
+            >
+              Aggiungi
+            </button>
+          </div>
+          {formData.notification_emails.length === 0 && (
+            <p className="text-[10px] text-gray-400 mt-1">Nessuna email aggiuntiva: verrà usata solo l'email principale dell'account.</p>
+          )}
         </div>
 
         <div className="pt-4 border-t mt-4 border-gray-100">

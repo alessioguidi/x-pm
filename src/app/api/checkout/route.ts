@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
     // Recupero info della Property
     const { data: prop } = await supabase.from('properties')
-      .select('name, default_checkin_staff_id, default_checkout_staff_id, default_cleaning_staff_id, security_deposit, deposit_percentage, cleaning_fee, pet_fee, city_tax_per_night, city_tax_max_nights, city_tax_child_age, extra_services')
+      .select('name, default_checkin_staff_id, default_checkout_staff_id, default_cleaning_staff_id, security_deposit, deposit_percentage, cleaning_fee, pet_fee, city_tax_per_night, city_tax_max_nights, city_tax_child_age, extra_services, notification_emails')
       .eq('id', payload.property_id)
       .single();
 
@@ -126,6 +126,8 @@ export async function POST(request: Request) {
 
     if (org && org.smtp_host && org.smtp_user && org.smtp_pass && org.smtp_from_email) {
        try {
+         const notifEmails = (prop as any)?.notification_emails || [];
+         const cc = notifEmails.length > 0 ? notifEmails : undefined;
          const transporter = nodemailer.createTransport({
            host: org.smtp_host, port: org.smtp_port || 465,
            secure: org.smtp_port === 465,
@@ -146,6 +148,7 @@ export async function POST(request: Request) {
            await transporter.sendMail({
              from: `"${org.name}" <${org.smtp_from_email}>`,
              to: payload.guest_email,
+             cc,
              subject: `Richiesta di Prenotazione - ${org.name}`,
              html: guestEmailHtml
            });
@@ -167,6 +170,7 @@ export async function POST(request: Request) {
            await transporter.sendMail({
              from: `"${org.name}" <${org.smtp_from_email}>`,
              to: org.smtp_from_email,
+             cc,
              subject: `Nuova Richiesta Prenotazione - ${prop?.name}`,
              html: adminEmailHtml
            });
@@ -191,16 +195,20 @@ export async function POST(request: Request) {
                <br/><p>Saluti,<br/>Lo staff di {{org_name}}</p>
              `;
            }
-           htmlContent = htmlContent
-             .replace(/{{guest_name}}/g, payload.guest_name || '')
-             .replace(/{{check_in_date}}/g, payload.check_in_date?.split('-').reverse().join('/') || '')
-             .replace(/{{check_out_date}}/g, payload.check_out_date?.split('-').reverse().join('/') || '')
-             .replace(/{{total_price}}/g, String(totalPrice))
-             .replace(/{{org_name}}/g, org.name);
+            const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
+            htmlContent = htmlContent
+              .replace(/{{guest_name}}/g, payload.guest_name || '')
+              .replace(/{{check_in_date}}/g, payload.check_in_date?.split('-').reverse().join('/') || '')
+              .replace(/{{check_out_date}}/g, payload.check_out_date?.split('-').reverse().join('/') || '')
+              .replace(/{{total_price}}/g, String(totalPrice))
+              .replace(/{{org_name}}/g, org.name)
+              .replace(/{{property_name}}/g, prop?.name || '')
+              .replace(/{{portal_link}}/g, `${origin}/guest/${booking.id}`);
 
            await transporter.sendMail({
              from: `"${org.name}" <${org.smtp_from_email}>`,
              to: payload.guest_email,
+             cc,
              subject: `Conferma Prenotazione - ${org.name}`,
              html: htmlContent
            });

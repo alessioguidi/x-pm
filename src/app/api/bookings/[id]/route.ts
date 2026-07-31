@@ -23,7 +23,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // Fetch booking
     const { data: booking, error: bkError } = await supabase
       .from('bookings')
-      .select('*, properties(name, deposit_percentage, default_checkin_staff_id, default_cleaning_staff_id), organizations(*)')
+      .select('*, properties(name, deposit_percentage, default_checkin_staff_id, default_cleaning_staff_id, notification_emails), organizations(*)')
       .eq('id', id)
       .single();
 
@@ -62,12 +62,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
        
        if (template && (org.smtp_host || org.smtp_config?.host)) {
           console.log("[SMTP] Dispatching email to:", booking.guest_email);
+          const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
+          const portalLink = `${origin}/guest/${booking.id}`;
           let html = template
              .replace(/{{guest_name}}/g, booking.guest_name)
              .replace(/{{check_in_date}}/g, booking.check_in_date.split('-').reverse().join('/'))
              .replace(/{{check_out_date}}/g, booking.check_out_date.split('-').reverse().join('/'))
              .replace(/{{total_price}}/g, booking.total_price)
-             .replace(/{{org_name}}/g, org.name || "Agency");
+             .replace(/{{org_name}}/g, org.name || "Agency")
+             .replace(/{{property_name}}/g, booking.properties?.name || "")
+             .replace(/{{portal_link}}/g, portalLink);
 
           const host = org.smtp_host || org.smtp_config?.host;
           const port = org.smtp_port || org.smtp_config?.port || 465;
@@ -89,6 +93,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
              await transporter.sendMail({
                  from: `"${org.name}" <${org.smtp_from_email || org.smtp_user || org.smtp_config?.fromEmail}>`,
                  to: booking.guest_email,
+                 cc: booking.properties?.notification_emails?.length ? booking.properties.notification_emails : undefined,
                  subject: status === 'confirmed' ? `Conferma Prenotazione: ${booking.properties?.name}` : `Annullamento Prenotazione`,
                  html: html
              });

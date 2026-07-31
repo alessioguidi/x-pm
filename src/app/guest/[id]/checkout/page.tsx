@@ -3,7 +3,7 @@
 import { useState, useEffect, use, Suspense } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, CheckCircle2, Upload, LogOut, Camera, Home, ClipboardList } from "lucide-react";
+import { Loader2, CheckCircle2, Upload, LogOut, Camera, Home, ClipboardList, ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function CheckoutWrapper({ params }: { params: Promise<{ id: string }> }) {
@@ -136,6 +136,12 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
           >
             Chiudi
           </button>
+          <a
+            href={`/guest/${bookingId}`}
+            className="block mt-3 text-blue-600 text-sm font-semibold hover:underline"
+          >
+            ← Torna al portal
+          </a>
         </div>
       </div>
     );
@@ -145,6 +151,9 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="bg-gradient-to-r from-emerald-700 to-emerald-500 rounded-2xl p-6 text-white shadow-lg">
+          <a href={`/guest/${bookingId}`} className="inline-flex items-center gap-1 text-emerald-200 hover:text-white text-xs font-bold mb-3 transition">
+            <ArrowLeft className="w-3.5 h-3.5" /> Torna al portal
+          </a>
           <Home className="w-10 h-10 mb-2 opacity-80" />
           <h1 className="text-2xl font-extrabold">Check-out</h1>
           <p className="text-emerald-100 mt-1">

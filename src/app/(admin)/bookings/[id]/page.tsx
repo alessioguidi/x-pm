@@ -295,11 +295,22 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center">
                 Prenotazione {booking.guest_name}
                 <span className={`ml-4 text-xs font-bold px-3 py-1 rounded-full uppercase ${
-                     booking.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
+                     booking.status === 'confirmed' || booking.status === 'deposit_paid' ? 'bg-emerald-100 text-emerald-700' :
                      booking.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                     'bg-rose-100 text-rose-700'
+                     booking.status === 'cancelled' || booking.status === 'closed_lost' ? 'bg-rose-100 text-rose-700' :
+                     booking.status === 'lead_new' ? 'bg-gray-100 text-gray-700' :
+                     booking.status === 'quote_sent' ? 'bg-sky-100 text-sky-700' :
+                     booking.status === 'negotiation' ? 'bg-purple-100 text-purple-700' :
+                     'bg-gray-100 text-gray-700'
                    }`}>
-                   {booking.status}
+                   {(() => {
+                     const labels: Record<string, string> = {
+                       'lead_new': 'Nuovo Lead', 'quote_sent': 'Preventivo Inviato', 'negotiation': 'Trattativa',
+                       'closed_lost': 'Persa', 'pending': 'In Attesa', 'confirmed': 'Confermata',
+                       'deposit_paid': 'Caparra Pagata', 'cancelled': 'Annullata', 'completed': 'Completata',
+                     };
+                     return labels[booking.status] || booking.status;
+                   })()}
                 </span>
             </h1>
              <p className="text-gray-500 font-medium text-sm flex items-center mt-1">
@@ -322,6 +333,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   </button>
                   <button onClick={() => { const l = `${window.location.origin}/guest/${id}/checkout`; navigator.clipboard.writeText(l); toast.success("Link check-out copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-purple-50 text-purple-700 px-3 py-2 rounded-full hover:bg-purple-100 transition flex items-center">
                     <Send className="w-3 h-3 mr-1" /> Check-out
+                  </button>
+                  <button onClick={() => { const l = `${window.location.origin}/guest/${id}`; navigator.clipboard.writeText(l); toast.success("Link portal ospite copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 px-3 py-2 rounded-full hover:bg-indigo-100 transition flex items-center">
+                    <Send className="w-3 h-3 mr-1" /> Portal
                   </button>
                   <button onClick={async () => {
                     toast.loading("Creazione pre-autorizzazione...", { id: "dep" });

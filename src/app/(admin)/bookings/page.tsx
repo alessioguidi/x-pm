@@ -389,14 +389,24 @@ export default function BookingsPage() {
     },
     {
       key: 'status', label: 'Stato', align: 'right',
-      render: (row) => (
-        <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-          row.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
-          'bg-amber-100 text-amber-700 border border-amber-200'
-        }`}>
-           {row.status === 'pending' ? 'In Attesa' : 'Confermata'}
-        </div>
-      )
+      render: (row) => {
+        const statusMap: Record<string, { label: string; cls: string }> = {
+          'lead_new':      { label: 'Nuovo Lead',     cls: 'bg-gray-100 text-gray-700 border border-gray-200' },
+          'quote_sent':    { label: 'Preventivo Inviato', cls: 'bg-sky-100 text-sky-700 border border-sky-200' },
+          'negotiation':   { label: 'Trattativa',     cls: 'bg-purple-100 text-purple-700 border border-purple-200' },
+          'closed_lost':   { label: 'Persa',          cls: 'bg-gray-200 text-gray-600 border border-gray-300' },
+          'pending':       { label: 'In Attesa',      cls: 'bg-amber-100 text-amber-700 border border-amber-200' },
+          'confirmed':     { label: 'Confermata',     cls: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
+          'deposit_paid':  { label: 'Caparra Pagata', cls: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
+          'cancelled':     { label: 'Annullata',      cls: 'bg-rose-100 text-rose-700 border border-rose-200' },
+        };
+        const s = statusMap[row.status] || { label: row.status, cls: 'bg-gray-100 text-gray-700 border border-gray-200' };
+        return (
+          <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${s.cls}`}>
+            {s.label}
+          </div>
+        );
+      }
     }
   ];
 
