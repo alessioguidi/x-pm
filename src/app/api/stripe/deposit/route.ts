@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
         .select("*, properties!inner(*)")
         .eq("id", booking_id)
         .single();
+      const property = booking.properties || {};
 
       if (!booking) return NextResponse.json({ error: "Prenotazione non trovata" }, { status: 404 });
 
@@ -32,14 +33,29 @@ export async function POST(req: NextRequest) {
 
       const pi = await createPreAuth(depositAmount, "eur", {
         booking_id: booking.id,
-        property_id: booking.properties.id,
-        property_name: booking.properties.name,
+        property_id: property.id,
+        property_name: property.name,
       });
 
       await supabase.from("bookings").update({
         deposit_status: "pending",
         stripe_payment_intent_id: pi.id,
       }).eq("id", booking.id);
+
+      const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
+      await supabase.from("stripe_transactions").insert({
+        organization_id: property.organization_id || booking.organization_id || null,
+        property_id: property.id,
+        booking_id: booking.id,
+        payment_intent_id: pi.id,
+        guest_name: booking.guest_name,
+        guest_email: booking.guest_email,
+        amount: depositAmount,
+        reason: "Cauzione Danni",
+        capture_method: "manual",
+        status: "pending",
+        payment_link: `${origin}/stripe-pay/${pi.id}`,
+      });
 
       return NextResponse.json({ client_secret: pi.client_secret, payment_intent_id: pi.id });
     }

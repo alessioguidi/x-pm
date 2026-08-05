@@ -64,6 +64,7 @@ export default function BookingsPage() {
 
   // Filter tabs for unified view
   const [filterTab, setFilterTab] = useState<string>('all'); // all, leads, active, closed
+  const [filterPropertyId, setFilterPropertyId] = useState<string>("");
 
   useEffect(() => { fetchData(); }, []);
 
@@ -428,14 +429,15 @@ export default function BookingsPage() {
 
   // Filter bookings by tab
   const todayStr = new Date().toISOString().split('T')[0];
-  const filteredBookings = bookings.filter(b => {
+  const propertyFiltered = filterPropertyId ? bookings.filter(b => b.property_id === filterPropertyId) : bookings;
+  const isActiveB = (b: any) => (b.check_in_date >= todayStr || b.check_out_date >= todayStr) && (b.status === 'pending' || b.status === 'confirmed');
+  const isPendingB = (b: any) => (b.check_in_date >= todayStr || b.check_out_date >= todayStr) && b.status === 'pending';
+  const isClosedB = (b: any) => (b.check_in_date < todayStr && b.check_out_date < todayStr) || b.status === 'cancelled';
+  const filteredBookings = propertyFiltered.filter(b => {
     if (filterTab === 'all') return true;
-    const isActive = (b.check_in_date >= todayStr || b.check_out_date >= todayStr) && (b.status === 'pending' || b.status === 'confirmed');
-    const isPending = (b.check_in_date >= todayStr || b.check_out_date >= todayStr) && b.status === 'pending';
-    const isClosed = (b.check_in_date < todayStr && b.check_out_date < todayStr) || b.status === 'cancelled';
-    if (filterTab === 'active') return isActive;
-    if (filterTab === 'pending') return isPending;
-    if (filterTab === 'closed') return isClosed;
+    if (filterTab === 'active') return isActiveB(b);
+    if (filterTab === 'pending') return isPendingB(b);
+    if (filterTab === 'closed') return isClosedB(b);
     return true;
   });
 
@@ -444,15 +446,32 @@ export default function BookingsPage() {
       {/* Filter tabs */}
       <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
         {[
-          { id: 'all', label: 'Tutte', count: bookings.length },
-          { id: 'active', label: 'Attive', count: bookings.filter(b => (b.check_in_date >= todayStr || b.check_out_date >= todayStr) && (b.status === 'pending' || b.status === 'confirmed')).length },
-          { id: 'pending', label: 'In Attesa', count: bookings.filter(b => (b.check_in_date >= todayStr || b.check_out_date >= todayStr) && b.status === 'pending').length },
-          { id: 'closed', label: 'Chiuse', count: bookings.filter(b => (b.check_in_date < todayStr && b.check_out_date < todayStr) || b.status === 'cancelled').length },
+          { id: 'all', label: 'Tutte', count: propertyFiltered.length },
+          { id: 'active', label: 'Attive', count: propertyFiltered.filter(isActiveB).length },
+          { id: 'pending', label: 'In Attesa', count: propertyFiltered.filter(isPendingB).length },
+          { id: 'closed', label: 'Chiuse', count: propertyFiltered.filter(isClosedB).length },
         ].map(tab => (
           <button key={tab.id} onClick={() => setFilterTab(tab.id)}
             className={`px-5 py-3 rounded-xl text-sm font-bold transition inline-flex items-center gap-2 ${filterTab === tab.id ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >{tab.label} <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filterTab === tab.id ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-700'}`}>{tab.count}</span></button>
         ))}
+        <div className="ml-auto flex items-center gap-2">
+          <select
+            value={filterPropertyId}
+            onChange={e => setFilterPropertyId(e.target.value)}
+            className="border border-gray-200 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-900"
+          >
+            <option value="">Tutti gli Immobili</option>
+            {properties.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          {filterPropertyId && (
+            <button onClick={() => setFilterPropertyId("")} className="p-2.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition" title="Rimuovi filtro">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <AdvancedDataGrid 
@@ -461,7 +480,14 @@ export default function BookingsPage() {
          columns={columns}
          filterableColumns={filterableColumns}
          loading={loading}
-         onAddClick={() => { resetWizard(); setCreateModal(true); }}
+         onAddClick={() => {
+           resetWizard();
+           if (filterPropertyId) {
+             setSelPropId(filterPropertyId);
+             loadPropertyData(filterPropertyId);
+           }
+           setCreateModal(true);
+         }}
          addButtonLabel="Nuova Prenotazione"
          bulkActions={bulkActions}
          onRowClick={(row) => router.push(`/bookings/${row.id}`)}

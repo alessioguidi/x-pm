@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BoxSelect, Home, Settings, CalendarDays, CheckSquare, Users, Inbox, ChevronLeft, ChevronRight, Building, Wallet, Contact2, MessageCircle, Megaphone } from "lucide-react";
+import { BoxSelect, Home, Settings, CalendarDays, CheckSquare, Users, Inbox, ChevronLeft, ChevronRight, Building, Wallet, Contact2, MessageCircle, Megaphone, CreditCard } from "lucide-react";
 import UserProfileDropdown from "@/components/admin/UserProfileDropdown";
 
 export default function AdminSidebar() {
@@ -20,6 +20,7 @@ export default function AdminSidebar() {
     { href: "/tasks", label: "Agenda", icon: CheckSquare },
     { href: "/contacts", label: "Contatti", icon: Contact2 },
     { href: "/cassa", label: "Cassa", icon: Wallet },
+    { href: "/stripe", label: "Pagamenti", icon: CreditCard },
     { href: "/staff", label: "Staff", icon: Users },
   ];
 

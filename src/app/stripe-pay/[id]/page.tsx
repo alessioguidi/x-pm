@@ -9,11 +9,13 @@ import { Loader2, ShieldCheck, CheckCircle2, AlertCircle, Home, CalendarDays, Us
 const isLiveMode = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.startsWith("pk_live_");
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-function CheckoutForm({ paymentIntentId, onDone }: { paymentIntentId: string; onDone: () => void }) {
+function CheckoutForm({ paymentIntentId, captureMethod, onDone }: { paymentIntentId: string; captureMethod?: string; onDone: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
+
+  const isPreAuth = captureMethod === "manual";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,8 +39,18 @@ function CheckoutForm({ paymentIntentId, onDone }: { paymentIntentId: string; on
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ payment_intent_id: paymentIntentId }),
       });
+      await fetch("/api/stripe/transactions/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_intent_id: paymentIntentId }),
+      });
       onDone();
     } else {
+      await fetch("/api/stripe/transactions/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_intent_id: paymentIntentId }),
+      });
       onDone();
     }
   };
@@ -57,10 +69,12 @@ function CheckoutForm({ paymentIntentId, onDone }: { paymentIntentId: string; on
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition shadow-lg flex items-center justify-center disabled:opacity-50 text-lg"
       >
         {processing ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : <ShieldCheck className="w-6 h-6 mr-2" />}
-        {processing ? "Elaborazione..." : "Autorizza Cauzione"}
+        {processing ? "Elaborazione..." : isPreAuth ? "Autorizza" : "Paga"}
       </button>
       <p className="text-xs text-gray-400 text-center">
-        Solo autorizzazione, nessun addebito. Verrà incassata solo in caso di danni.
+        {isPreAuth
+          ? "Solo autorizzazione, nessun addebito. Verrà incassata solo in caso di danni."
+          : "Pagamento sicuro tramite Stripe. Riceverai conferma via email."}
       </p>
     </form>
   );
@@ -134,11 +148,13 @@ export default function StripePayPage({ params }: { params: Promise<{ id: string
       canceled: "Annullata",
       processing: "In elaborazione",
     };
+    const isSuccess = piInfo?.status === "succeeded";
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 p-4">
         <div className="bg-white p-8 rounded-2xl shadow-xl max-w-sm text-center">
-          <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Pre-autorizzazione {statusLabels[piInfo?.status] || piInfo?.status}</h2>
+          {isSuccess ? <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-4" /> : <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-4" />}
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Pagamento {statusLabels[piInfo?.status] || piInfo?.status}</h2>
+          <p className="text-gray-600 font-medium">{piInfo?.reason || "Cauzione Danni"}</p>
           <p className="text-gray-500">Importo: €{piInfo?.amount?.toFixed(2)}</p>
         </div>
       </div>
@@ -155,16 +171,18 @@ export default function StripePayPage({ params }: { params: Promise<{ id: string
             </span>
           )}
           <ShieldCheck className="w-10 h-10 mx-auto mb-2 opacity-90" />
-          <h2 className="text-xl font-bold">Cauzione Danni</h2>
+          <h2 className="text-xl font-bold">{piInfo?.reason || "Cauzione Danni"}</h2>
           <p className="text-blue-100 text-sm mt-1">
-            Pre-autorizzazione di €{piInfo?.amount?.toFixed(2)} — nessun addebito ora
+            {piInfo?.capture_method === "manual"
+              ? `Pre-autorizzazione di €${piInfo?.amount?.toFixed(2)} — nessun addebito ora`
+              : `Pagamento di €${piInfo?.amount?.toFixed(2)} tramite Stripe`}
           </p>
         </div>
         <div className="p-5 space-y-4">
           <BookingCard booking={piInfo?.booking} />
           {clientSecret ? (
             <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
-              <CheckoutForm paymentIntentId={id} onDone={() => window.location.reload()} />
+              <CheckoutForm paymentIntentId={id} captureMethod={piInfo?.capture_method} onDone={() => window.location.reload()} />
             </Elements>
           ) : (
             <p className="text-gray-500 text-center">Elaborazione...</p>

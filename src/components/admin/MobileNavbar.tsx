@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, CalendarDays, Inbox, Users, Settings, MessageCircle, Eye, Megaphone, Building, CheckSquare, Contact2, Wallet, LayoutGrid, X } from "lucide-react";
+import { Home, CalendarDays, Inbox, Users, Settings, MessageCircle, Eye, Megaphone, Building, CheckSquare, Contact2, Wallet, CreditCard, LayoutGrid, X } from "lucide-react";
 
 const mainNav = [
   { href: "/dashboard", icon: Home, label: "Home" },
@@ -18,6 +18,7 @@ const moreItems = [
   { href: "/properties", icon: Building, label: "Immobili" },
   { href: "/contacts", icon: Contact2, label: "Contatti" },
   { href: "/cassa", icon: Wallet, label: "Cassa" },
+  { href: "/stripe", icon: CreditCard, label: "Pagam." },
   { href: "/staff", icon: Users, label: "Staff" },
   { href: "/settings", icon: Settings, label: "Impostazioni" },
 ];

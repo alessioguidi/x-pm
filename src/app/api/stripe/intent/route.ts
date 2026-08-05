@@ -32,6 +32,9 @@ export async function GET(req: NextRequest) {
       currency: pi.currency,
       status: pi.status,
       client_secret: pi.client_secret,
+      reason: pi.metadata?.reason || pi.description || "Cauzione Danni",
+      guest_name: pi.metadata?.guest_name || booking?.guest_name || null,
+      capture_method: pi.capture_method,
       booking,
     });
   } catch {
