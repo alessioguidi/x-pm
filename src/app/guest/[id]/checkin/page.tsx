@@ -100,7 +100,6 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const [completed, setCompleted] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   // Ospiti già registrati per questa prenotazione
   const [existingGuests, setExistingGuests] = useState<any[]>([]);
@@ -109,9 +108,6 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
   const [showNewForm, setShowNewForm] = useState(false);
 
   useEffect(() => {
-    // Check se l'utente è loggato (admin)
-    supabase.auth.getUser().then(({ data }) => setIsAdmin(!!data.user));
-
     async function fetchBooking() {
       const { data, error } = await supabase
         .from('bookings')
@@ -267,7 +263,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
   };
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-gray-50"><Loader2 className="w-10 h-10 animate-spin text-blue-600"/></div>;
-  if (error || !booking) return <div className="flex h-screen items-center justify-center p-4 text-center text-gray-500">{error}<br/>{isAdmin && <><a href="/bookings" className="mt-4 inline-flex items-center gap-1 text-blue-600 font-bold hover:underline text-sm"><ArrowLeft className="w-3.5 h-3.5" /> Torna alle prenotazioni</a></>}</div>;
+  if (error || !booking) return <div className="flex h-screen items-center justify-center p-4 text-center text-gray-500">{error}<br/></div>;
 
   if (completed) {
     return (
@@ -296,11 +292,6 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
             <a href={`/guest/${bookingId}`} className="inline-flex items-center gap-1 text-blue-200 hover:text-white text-xs font-bold transition">
               <ArrowLeft className="w-3.5 h-3.5" /> Torna al portal
             </a>
-            {isAdmin && (
-            <a href={`/bookings/${bookingId}`} className="inline-flex items-center gap-1 text-blue-200 hover:text-white text-xs font-bold transition">
-              <ArrowLeft className="w-3.5 h-3.5" /> Vai alla prenotazione
-            </a>
-            )}
           </div>
           <div className="relative z-10">
              <h1 className="text-2xl font-extrabold mb-1">Registrazione Ospiti</h1>
