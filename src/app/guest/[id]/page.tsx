@@ -3,7 +3,7 @@
 import { useState, useEffect, use, Suspense } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, Home, CalendarDays, Users, Euro, Wifi, LogIn, LogOut, Utensils, Landmark, Phone, MapPin, BookOpen, DoorOpen, ShieldCheck, Hourglass } from "lucide-react";
+import { Loader2, Home, CalendarDays, Users, Wifi, LogIn, LogOut, Utensils, Landmark, Phone, MapPin, BookOpen, DoorOpen, ShieldCheck, Hourglass } from "lucide-react";
 import { addDays, parseISO, startOfDay, isAfter, format } from "date-fns";
 
 export default function GuestPortalWrapper({ params }: { params: Promise<{ id: string }> }) {
@@ -137,12 +137,6 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
                   <div className="text-xs text-gray-400 font-semibold uppercase">Ospiti</div>
                   <div className="font-bold text-gray-900 mt-0.5">{booking.guests_count}</div>
                 </div>
-                {booking.total_price > 0 && (
-                  <div className="col-span-2 border-t pt-3 mt-1 flex items-center justify-between">
-                    <div className="text-xs text-gray-400 font-semibold uppercase">Totale Soggiorno</div>
-                    <div className="text-lg font-extrabold text-gray-900">€{Number(booking.total_price).toLocaleString("it-IT")}</div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -162,11 +156,11 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
               </a>
             </div>
 
-            {/* ARRIVO E CASA */}
+            {/* ARRIVO */}
             <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-6 space-y-5">
               <div className="flex items-center gap-3 border-b pb-4">
                 <DoorOpen className="w-6 h-6 text-blue-600" />
-                <h2 className="text-lg font-bold text-gray-900">Arrivo e Soggiorno</h2>
+                <h2 className="text-lg font-bold text-gray-900">Arrivo</h2>
               </div>
 
               {wifi?.network && (
@@ -191,28 +185,35 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
                   <p className="text-gray-700 text-sm whitespace-pre-line">{prop.check_in_instructions}</p>
                 </div>
               )}
-
-              {prop?.house_manual && (
-                <div>
-                  <div className="text-xs text-gray-400 font-semibold uppercase mb-1">Manuale della Casa</div>
-                  <p className="text-gray-700 text-sm whitespace-pre-line">{prop.house_manual}</p>
-                </div>
-              )}
-
-              {Object.values(rules).some(Boolean) && (
-                <div>
-                  <div className="text-xs text-gray-400 font-semibold uppercase mb-2">Regole della Casa</div>
-                  <div className="space-y-2">
-                    {rules.pets_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-600" /> Animali ammessi</div>}
-                    {rules.smoking_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-amber-600" /> Fumo ammesso</div>}
-                    {rules.events_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-purple-600" /> Eventi ammessi</div>}
-                    {!rules.pets_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-gray-400" /> No animali</div>}
-                    {!rules.smoking_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-gray-400" /> No fumo</div>}
-                    {!rules.events_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-gray-400" /> No eventi</div>}
-                  </div>
-                </div>
-              )}
             </div>
+
+            {/* MANUALE DELLA CASA */}
+            {(prop?.house_manual || Object.values(rules).some(Boolean)) && (
+              <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-6 space-y-5">
+                <div className="flex items-center gap-3 border-b pb-4">
+                  <BookOpen className="w-6 h-6 text-blue-600" />
+                  <h2 className="text-lg font-bold text-gray-900">Manuale della Casa</h2>
+                </div>
+
+                {prop?.house_manual && (
+                  <p className="text-gray-700 text-sm whitespace-pre-line">{prop.house_manual}</p>
+                )}
+
+                {Object.values(rules).some(Boolean) && (
+                  <div>
+                    <div className="text-xs text-gray-400 font-semibold uppercase mb-2">Regole della Casa</div>
+                    <div className="space-y-2">
+                      {rules.pets_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-600" /> Animali ammessi</div>}
+                      {rules.smoking_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-amber-600" /> Fumo ammesso</div>}
+                      {rules.events_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-purple-600" /> Eventi ammessi</div>}
+                      {!rules.pets_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-gray-400" /> No animali</div>}
+                      {!rules.smoking_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-gray-400" /> No fumo</div>}
+                      {!rules.events_allowed && <div className="text-sm text-gray-700 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-gray-400" /> No eventi</div>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* GUIDA RISTORANTI */}
             {restaurants.length > 0 && (
