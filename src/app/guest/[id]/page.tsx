@@ -94,7 +94,7 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
 
   const showCheckIn = booking.status !== 'cancelled';
   const showCheckOut = booking.status !== 'cancelled' && booking.checkout_submitted_at === null;
-  const checkInEnabled = showCheckIn;
+  const checkInEnabled = showCheckIn && pendingTotal <= 0;
   const checkOutEnabled = showCheckOut && pendingTotal <= 0 && checkInCompleted;
 
   const handlePay = async () => {
@@ -223,7 +223,7 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
                 href={checkInEnabled ? `/guest/${booking.id}/checkin` : undefined}
                 onClick={e => { if (!checkInEnabled) e.preventDefault(); }}
                 className={`${checkInEnabled ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'} text-white font-bold py-4 rounded-2xl transition flex items-center justify-center ${checkInEnabled ? 'shadow-lg' : 'opacity-70'}`}
-                title={checkInEnabled ? undefined : "Prenotazione annullata"}
+                title={checkInEnabled ? undefined : pendingTotal > 0 ? "Paga le spese in sospeso per attivare il check-in" : "Prenotazione annullata"}
               >
                 {checkInEnabled ? <LogIn className="w-6 h-6 mr-2" /> : <Lock className="w-6 h-6 mr-2" />} Check-in
               </a>
@@ -231,7 +231,7 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
                 href={checkOutEnabled ? `/guest/${booking.id}/checkout` : undefined}
                 onClick={e => { if (!checkOutEnabled) e.preventDefault(); }}
                 className={`${checkOutEnabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-gray-300 cursor-not-allowed'} text-white font-bold py-4 rounded-2xl transition flex items-center justify-center ${checkOutEnabled ? 'shadow-lg' : 'opacity-70'}`}
-                title={checkOutEnabled ? undefined : !checkInCompleted ? "Il check-out si attiva dopo aver completato il check-in" : "Completa il check-in per attivare il check-out"}
+                title={checkOutEnabled ? undefined : pendingTotal > 0 ? "Paga le spese in sospeso per attivare il check-out" : !checkInCompleted ? "Il check-out si attiva dopo aver completato il check-in" : "Completa il check-in per attivare il check-out"}
               >
                 {checkOutEnabled ? <LogOut className="w-6 h-6 mr-2" /> : <Lock className="w-6 h-6 mr-2" />} Check-out
               </a>
