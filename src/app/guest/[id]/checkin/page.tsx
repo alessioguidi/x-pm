@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, use, Suspense } from "react";
 import { supabase } from "@/utils/supabase/client";
-import { Loader2, Upload, FileImageIcon, CheckCircle2, User, Calendar, MapPin, Search, FileText, ArrowLeft } from "lucide-react";
+import { Loader2, Upload, FileImageIcon, CheckCircle2, User, Calendar, MapPin, Search, FileText, ArrowLeft, Home } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatDateRange } from "@/lib/format";
 
@@ -63,9 +63,11 @@ function ComuneAutocomplete({ value, code, onChange }: { value: string; code: st
   const [results, setResults] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     setQuery(value);
+    setDirty(false);
   }, [value]);
 
   useEffect(() => {
@@ -83,11 +85,11 @@ function ComuneAutocomplete({ value, code, onChange }: { value: string; code: st
         .order('descrizione', { ascending: true })
         .limit(12);
       setResults(data || []);
-      setOpen(true);
+      if (dirty) setOpen(true);
       setLoading(false);
     }, 300);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, dirty]);
 
   return (
     <div className="relative">
@@ -95,13 +97,13 @@ function ComuneAutocomplete({ value, code, onChange }: { value: string; code: st
         type="text"
         required
         value={query}
-        onChange={e => { setQuery(e.target.value); onChange(e.target.value, ""); }}
-        onFocus={() => { if (results.length) setOpen(true); }}
+        onChange={e => { setQuery(e.target.value); setDirty(true); onChange(e.target.value, ""); }}
+        onFocus={() => { if (results.length && dirty) setOpen(true); }}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
         placeholder="Digita il comune..."
         className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none"
       />
-      {open && results.length > 0 && (
+      {open && results.length > 0 && dirty && (
         <div className="absolute z-20 mt-1 w-full bg-white border-2 border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
           {results.map(r => (
             <button
@@ -134,7 +136,7 @@ const initialForm = (): GuestForm => ({  type: "17",
   residence_city: "",
   residence_city_code: "",
   residence_address: "",
-  document_type: "IDENT",
+  document_type: "IDELE",
   document_number: "",
   document_issue_country: "100000100",
   document_issue_city: "",
@@ -185,7 +187,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
     async function fetchBooking() {
       const { data, error } = await supabase
         .from('bookings')
-        .select('*, properties(name)')
+        .select('*, properties(name, logo_url)')
         .eq('id', bookingId)
         .single();
 
@@ -220,7 +222,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
           setForm({
             ...initialForm(),
             ...guestToEdit,
-            document_type: legacyDocMap[guestToEdit.document_type] || guestToEdit.document_type || "IDENT",
+            document_type: legacyDocMap[guestToEdit.document_type] || guestToEdit.document_type || "IDELE",
             document_front_file: null,
             document_back_file: null,
           });
@@ -398,7 +400,14 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
             </a>
           </div>
           <div className="relative z-10">
-             <h1 className="text-2xl font-extrabold mb-1">Registrazione Ospiti</h1>
+             <div className="flex items-center gap-3 mb-1">
+               {booking.properties?.logo_url ? (
+                 <img src={booking.properties.logo_url} alt="Logo struttura" className="w-10 h-10 rounded-full bg-white/20 object-cover border border-white/40" />
+               ) : (
+                 <Home className="w-10 h-10 opacity-80" />
+               )}
+               <h1 className="text-2xl font-extrabold">Registrazione Ospiti</h1>
+             </div>
              <p className="text-blue-100 font-medium opacity-90"><MapPin className="inline w-4 h-4 mr-1"/> {booking.properties?.name}</p>
              <div className="mt-4 flex flex-col md:flex-row gap-4 divide-y md:divide-y-0 md:divide-x divide-blue-400">
                <div className="pt-2 md:pt-0">
@@ -435,7 +444,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                     </div>
                     <button
                       onClick={() => {
-                        const legacyDocMap: Record<string, string> = { "CARTA IDENTITA": "IDENT", "PASSAPORTO": "PASOR", "PATENTE": "PATEN" };
+          const legacyDocMap: Record<string, string> = { "CARTA IDENTITA": "IDENT", "CARTA IDENTITA' ELETTRONICA": "IDELE", "PASSAPORTO": "PASOR", "PATENTE": "PATEN" };
                         setForm({
                           ...initialForm(),
                           ...guest,
@@ -510,8 +519,11 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                       </>
                    ) : (
                       <>
-                        <option value="19">Membro Gruppo (19)</option>
-                        <option value="20">Familiare (20)</option>
+                        <option value="17">Capo Famiglia (17)</option>
+                        <option value="18">Capo Gruppo (18)</option>
+                        <option value="19">Familiare (19)</option>
+                        <option value="20">Membro Gruppo (20)</option>
+                        <option value="16">Ospite Singolo (16)</option>
                       </>
                    )}
                 </select>

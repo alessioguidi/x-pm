@@ -30,7 +30,7 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
     async function fetchData() {
       const { data, error } = await supabase
         .from("bookings")
-        .select("*, properties!inner(name, deposit_method, checkout_checklist)")
+        .select("*, properties!inner(name, logo_url, deposit_method, checkout_checklist)")
         .eq("id", bookingId)
         .single();
 
@@ -154,7 +154,11 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
           <a href={`/guest/${bookingId}`} className="inline-flex items-center gap-1 text-emerald-200 hover:text-white text-xs font-bold mb-3 transition">
             <ArrowLeft className="w-3.5 h-3.5" /> Torna al portal
           </a>
-          <Home className="w-10 h-10 mb-2 opacity-80" />
+          {booking.properties?.logo_url ? (
+            <img src={booking.properties.logo_url} alt="Logo struttura" className="w-10 h-10 mb-2 rounded-full bg-white/20 object-cover border border-white/40" />
+          ) : (
+            <Home className="w-10 h-10 mb-2 opacity-80" />
+          )}
           <h1 className="text-2xl font-extrabold">Check-out</h1>
           <p className="text-emerald-100 mt-1">
             {booking.properties?.name} — {new Date(booking.check_out_date).toLocaleDateString("it-IT")}

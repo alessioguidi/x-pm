@@ -245,11 +245,16 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       xml += `<arrivi>\n`;
 
       let capoId = "";
-      bookingGuests.forEach(g => {
+      const orderedGuests = [...bookingGuests].sort((a, b) => {
+         const aLeader = ["16", "17", "18"].includes(a.type) ? 0 : 1;
+         const bLeader = ["16", "17", "18"].includes(b.type) ? 0 : 1;
+         return aLeader - bLeader;
+      });
+      orderedGuests.forEach(g => {
           if (["16", "17", "18"].includes(g.type)) capoId = g.id.substring(0, 18).replace(/-/g, '');
       });
 
-      bookingGuests.forEach(g => {
+      orderedGuests.forEach(g => {
           const isLeader = ["16", "17", "18"].includes(g.type);
           const idswh = g.id.substring(0, 18).replace(/-/g, '');
           const capoRef = isLeader ? "" : `<idcapo>${capoId}</idcapo>`;
@@ -399,8 +404,15 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       const tassa = Number(booking.tax_amount || 0) > 0 ? "1" : "0";
       const codStruttura = (booking.properties?.cir || booking.properties?.cin || "STRUTTURA").replace(/[^A-Za-z0-9]/g, "");
 
+      // Il tracciato richiede prima i capi (16/17/18) e subito dopo i componenti (19/20)
+      const orderedGuests = [...bookingGuests].sort((a, b) => {
+         const aLeader = ["16", "17", "18"].includes(a.type) ? 0 : 1;
+         const bLeader = ["16", "17", "18"].includes(b.type) ? 0 : 1;
+         return aLeader - bLeader;
+      });
+
       const rows: string[] = [];
-      for (const g of bookingGuests) {
+      for (const g of orderedGuests) {
          const isLeader = ["16", "17", "18"].includes(g.type);
          const sesso = g.gender === "F" ? "2" : "1";
          const bornItaly = g.birth_country === "100000100";

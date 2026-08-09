@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/utils/supabase/client";
-import { Building2, MapPin, Bed, Save, Edit3, X, ShieldCheck } from "lucide-react";
+import { Building2, MapPin, Bed, Save, Edit3, X, ShieldCheck, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
@@ -40,10 +40,36 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
     is_active: property.is_active || false,
     cir: property.cir || "",
     cin: property.cin || "",
+    logo_url: property.logo_url || "",
     notification_emails: Array.isArray(property.notification_emails) ? (property.notification_emails as string[]) : [],
   });
 
   const [emailInput, setEmailInput] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      if (!e.target.files || e.target.files.length === 0) return;
+      const file = e.target.files[0];
+      setUploadingLogo(true);
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo-${property.slug || 'immobile'}-${Math.random()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('property_images')
+        .upload(fileName, file);
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('property_images').getPublicUrl(fileName);
+      setFormData({ ...formData, logo_url: data.publicUrl });
+      toast.success("Logo caricato! Ricordati di salvare.");
+    } catch (e) {
+      toast.error("Errore caricamento logo");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const addEmails = (raw: string) => {
     const emails = raw.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
@@ -107,6 +133,19 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
           <Edit3 className="w-5 h-5" />
         </button>
         <h3 className="text-lg font-medium border-b pb-2 mb-4 text-gray-900">Dettagli Immobile</h3>
+        <div className="flex items-center gap-4 mb-4">
+          {property.logo_url ? (
+            <img src={property.logo_url} alt="Logo struttura" className="w-14 h-14 rounded-xl object-cover border border-gray-200 bg-white" />
+          ) : (
+            <div className="w-14 h-14 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400">
+              <Building2 className="w-6 h-6" />
+            </div>
+          )}
+          <div>
+            <div className="text-sm font-semibold text-gray-800">{property.logo_url ? "Logo presente" : "Nessun logo"}</div>
+            <p className="text-xs text-gray-500">Usato nei link della prenotazione</p>
+          </div>
+        </div>
         <ul className="space-y-3 text-sm text-gray-600">
           <li className="flex items-center"><Building2 className="w-4 h-4 mr-2" /> SaaS: {property.organizations?.name}</li>
           <li className="flex items-center"><MapPin className="w-4 h-4 mr-2" /> {property.city}</li>
@@ -141,6 +180,33 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
         <div>
            <label className="block text-xs font-medium text-gray-700">Nome</label>
            <input type="text" className="w-full border rounded p-2 text-sm text-gray-900 focus:ring-blue-500" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+        </div>
+
+        <div className="pt-4 border-t border-gray-100">
+          <h4 className="text-sm font-semibold mb-1 text-gray-900">Logo della Struttura</h4>
+          <p className="text-[11px] text-gray-500 mb-3 leading-tight">
+            Usato nei link generati dalla prenotazione (portal, check-in, check-out). Se non inserito viene usato il logo di sistema.
+          </p>
+          <div className="flex items-center gap-4">
+            {formData.logo_url ? (
+              <img src={formData.logo_url} alt="Logo struttura" className="w-16 h-16 rounded-xl object-cover border border-gray-200 bg-white" />
+            ) : (
+              <div className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400">
+                <Building2 className="w-6 h-6" />
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              <label className={`inline-flex items-center justify-center px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium border border-gray-300 cursor-pointer transition ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
+                <Upload className="w-4 h-4 mr-2" /> {uploadingLogo ? "Caricamento..." : formData.logo_url ? "Cambia Logo" : "Carica Logo"}
+                <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+              </label>
+              {formData.logo_url && (
+                <button type="button" onClick={() => setFormData({ ...formData, logo_url: "" })} className="inline-flex items-center px-4 py-2 rounded bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium border border-red-200 transition">
+                  <X className="w-4 h-4 mr-2" /> Rimuovi
+                </button>
+              )}
+            </div>
+          </div>
         </div>
         
         <div className="flex items-center bg-gray-50 p-2 rounded border">

@@ -8,6 +8,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   let title = "Pagamento Sicuro";
   let description = "Pagamento tramite Stripe";
+  let logo = "/icons/icon-512.png";
 
   try {
     const pi = await stripe.paymentIntents.retrieve(id);
@@ -21,6 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       if (booking) {
         const dates = `${booking.check_in_date?.split("-").reverse().join("/")} - ${booking.check_out_date?.split("-").reverse().join("/")}`;
         description = `Prenotazione di ${booking.guest_name}${dates ? ` • ${dates}` : ""} • €${amount}`;
+        if (booking.properties?.logo_url) logo = booking.properties.logo_url;
       }
     }
   } catch {
@@ -30,8 +32,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description,
-    openGraph: { title, description, type: "website", siteName: "Property Manager", images: [{ url: "/icons/icon-512.png", width: 512, height: 512 }] },
-    twitter: { card: "summary", title, description, images: ["/icons/icon-512.png"] },
+    openGraph: { title, description, type: "website", siteName: "Property Manager", images: [{ url: logo, width: 512, height: 512 }] },
+    twitter: { card: "summary", title, description, images: [logo] },
   };
 }
 

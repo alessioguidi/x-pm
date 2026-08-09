@@ -85,7 +85,12 @@ function BookingCard({ booking }: { booking: any }) {
   return (
     <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm border border-gray-200">
       <div className="flex items-center gap-2 text-gray-700 font-medium">
-        <Home className="w-4 h-4 text-blue-500" /> {booking.properties?.name || "Struttura"}
+        {booking.properties?.logo_url ? (
+          <img src={booking.properties.logo_url} alt="Logo struttura" className="w-5 h-5 rounded-full object-cover border border-gray-200" />
+        ) : (
+          <Home className="w-4 h-4 text-blue-500" />
+        )}
+        {booking.properties?.name || "Struttura"}
       </div>
       <div className="flex items-center gap-2 text-gray-600">
         <User className="w-4 h-4 text-blue-400" /> {booking.guest_name || "Ospite"}

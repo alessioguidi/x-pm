@@ -11,7 +11,7 @@ export async function getGuestBookingMeta(id: string) {
   const supabase = getSupabaseServer();
   const { data } = await supabase
     .from("bookings")
-    .select("guest_name, check_in_date, check_out_date, properties(name)")
+    .select("guest_name, check_in_date, check_out_date, properties(name, logo_url)")
     .eq("id", id)
     .single();
 
