@@ -34,13 +34,13 @@ export const metadata: Metadata = {
     description: "Gestione proprietà immobiliari — prenotazioni, check-in, check-out e rendicontazione",
     type: "website",
     siteName: "Property Manager",
-    images: [{ url: "/og.png", width: 1200, height: 630 }]
+    images: [{ url: "/icons/icon-512.png", width: 512, height: 512 }]
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "Property Manager",
     description: "Gestione proprietà immobiliari — prenotazioni, check-in, check-out e rendicontazione",
-    images: ["/og.png"]
+    images: ["/icons/icon-512.png"]
   }
 };
 
