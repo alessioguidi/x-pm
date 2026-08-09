@@ -402,9 +402,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
           <div className="relative z-10">
              <div className="flex items-center gap-3 mb-1">
                 {booking.properties?.logo_url ? (
-                  <div className="w-14 h-14 rounded-2xl bg-white p-2 flex items-center justify-center shrink-0">
-                    <img src={booking.properties.logo_url} alt="Logo struttura" className="w-full h-full object-contain" />
-                  </div>
+                  <img src={booking.properties.logo_url} alt="Logo struttura" className="w-10 h-10 rounded-full bg-white/20 object-cover border border-white/40" />
                 ) : (
                   <Home className="w-10 h-10 opacity-80" />
                 )}

@@ -123,9 +123,7 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {prop?.logo_url || org?.logo_url ? (
-                <div className="w-16 h-16 rounded-2xl bg-white p-2 flex items-center justify-center shrink-0">
-                  <img src={prop?.logo_url || org?.logo_url} alt={prop?.name || org?.name} className="w-full h-full object-contain" />
-                </div>
+                <img src={prop?.logo_url || org?.logo_url} alt={prop?.name || org?.name} className="w-10 h-10 rounded-full bg-white/20 object-cover" />
               ) : (
                 <Home className="w-10 h-10 opacity-80" />
               )}
