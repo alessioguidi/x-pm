@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { getGuestBookingMeta, fmtRange } from "@/utils/supabase/server";
+import { getGuestBookingMeta } from "@/utils/supabase/server";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,8 +18,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   const propName = booking?.properties?.name || "Struttura";
-  const guestName = booking?.guest_name || "Ospite";
-  const dates = booking ? fmtRange(booking.check_in_date, booking.check_out_date) : "";
 
   return new ImageResponse(
     (
@@ -31,31 +29,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #1d4ed8, #6366f1)",
-          color: "white",
-          padding: 60,
+          background: "white",
+          padding: 80,
         }}
       >
-        {logoDataUrl && (
+        {logoDataUrl ? (
           <div
             style={{
-              width: 180,
-              height: 180,
-              borderRadius: 36,
-              background: "white",
+              width: 560,
+              height: 560,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              overflow: "hidden",
-              marginBottom: 36,
             }}
           >
             {/* satori img */}
-            <img src={logoDataUrl} width={150} height={150} style={{ objectFit: "contain" }} />
+            <img src={logoDataUrl} width={560} height={560} style={{ objectFit: "contain" }} />
           </div>
+        ) : (
+          <div style={{ fontSize: 64, fontWeight: 800, color: "#1d4ed8", textAlign: "center", lineHeight: 1.2 }}>{propName}</div>
         )}
-        <div style={{ fontSize: 56, fontWeight: 800, textAlign: "center", lineHeight: 1.2 }}>{propName}</div>
-        <div style={{ fontSize: 30, opacity: 0.95, marginTop: 18, textAlign: "center" }}>{`Prenotazione di ${guestName}${dates ? ` • ${dates}` : ""}`}</div>
       </div>
     ),
     { width: 1200, height: 630 }
