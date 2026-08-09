@@ -26,26 +26,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           height: "100%",
           width: "100%",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "white",
-          padding: 80,
         }}
       >
         {logoDataUrl ? (
-          <div
-            style={{
-              width: 560,
-              height: 560,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {/* satori img */}
-            <img src={logoDataUrl} width={560} height={560} style={{ objectFit: "contain" }} />
-          </div>
+          /* satori img */
+          <img src={logoDataUrl} width={1200} height={630} style={{ objectFit: "contain" }} />
         ) : (
           <div style={{ fontSize: 64, fontWeight: 800, color: "#1d4ed8", textAlign: "center", lineHeight: 1.2 }}>{propName}</div>
         )}
