@@ -39,7 +39,7 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
       }
 
       const [pmtRes, guestsRes] = await Promise.all([
-        supabase.from("booking_payments").select("*").eq("booking_id", bookingId).eq("status", "scheduled"),
+        supabase.from("cash_transactions").select("*").eq("booking_id", bookingId).eq("status", "scheduled"),
         supabase.from("booking_guests").select("id", { count: "exact", head: true }).eq("booking_id", bookingId),
       ]);
       setPendingPayments((pmtRes.data || []).filter(p => Number(p.amount) > 0));

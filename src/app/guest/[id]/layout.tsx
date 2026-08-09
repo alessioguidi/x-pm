@@ -12,8 +12,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description,
-    openGraph: { title, description, type: "website", siteName: "Property Manager" },
-    twitter: { card: "summary", title, description },
+    openGraph: { title, description, type: "website", siteName: "Property Manager", images: [{ url: "/og.png", width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: ["/og.png"] },
   };
 }
 

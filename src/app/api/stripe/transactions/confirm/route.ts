@@ -39,14 +39,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Pagamento riuscito: registra i booking_payments in sospeso come incassati
-    if (pi.status === "succeeded" && pi.metadata?.booking_id) {
-      const { error: bpError } = await supabase
-        .from("booking_payments")
-        .update({ status: "completed", payment_method: "Stripe" })
-        .eq("booking_id", pi.metadata.booking_id)
-        .eq("status", "scheduled");
-      if (bpError) console.error("[stripe/transactions/confirm] booking_payments update failed", bpError);
+    // Pagamento riuscito: registra come incassati i movimenti di Prima Nota inclusi nel pagamento online
+    if (pi.status === "succeeded" && pi.metadata?.tx_ids) {
+      const ids = pi.metadata.tx_ids.split(",").filter(Boolean);
+      if (ids.length > 0) {
+        const { error: ctError } = await supabase
+          .from("cash_transactions")
+          .update({ status: "confirmed" })
+          .in("id", ids)
+          .eq("status", "scheduled");
+        if (ctError) console.error("[stripe/transactions/confirm] cash_transactions update failed", ctError);
+      }
     }
 
     return NextResponse.json({ success: true, status: newStatus, transaction: data || null });

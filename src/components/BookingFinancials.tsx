@@ -290,11 +290,16 @@ export default function BookingFinancials({ booking: initialBooking, onBookingUp
       newPayments.push({ organization_id: orgId, property_id: propId, booking_id: bId, amount: fees.down_payment, status: 'scheduled', payment_method: 'Bonifico', reason: 'Caparra', transaction_type: 'deposit_collection', notes: `Caparra (${depositPct}%) — da versare anticipatamente`, created_at: new Date().toISOString() });
     }
     const totalPrice = Number(booking.total_price || fees.base_price + fees.cleaning_fee);
-    const saldoAmount = totalPrice - fees.down_payment;
+    const cleaningFee = Number(fees.cleaning_fee) || 0;
+    // Le spese di pulizia/biancheria restano nel totale preventivo ma si incassano a parte (Stripe online o cash all'arrivo)
+    const saldoAmount = totalPrice - Number(fees.down_payment) - cleaningFee;
     if (saldoAmount > 0) {
       const dueDate = new Date(checkInDate);
       dueDate.setDate(dueDate.getDate() - 2);
       newPayments.push({ organization_id: orgId, property_id: propId, booking_id: bId, amount: saldoAmount, status: 'scheduled', payment_method: 'Bonifico', reason: 'Saldo', transaction_type: 'stay_balance', notes: `Saldo soggiorno — da versare entro il ${dueDate.toISOString().split('T')[0].split('-').reverse().join('/')}`, created_at: dueDate.toISOString() });
+    }
+    if (cleaningFee > 0) {
+      newPayments.push({ organization_id: orgId, property_id: propId, booking_id: bId, amount: cleaningFee, status: 'scheduled', payment_method: 'Contante', reason: 'Pulizie', transaction_type: 'stay_balance', notes: "Spese pulizie e biancheria — da incassare a parte", created_at: new Date(checkInDate).toISOString() });
     }
     if (fees.security_deposit > 0) {
       newPayments.push({ organization_id: orgId, property_id: propId, booking_id: bId, amount: fees.security_deposit, status: 'scheduled', payment_method: 'Contante', reason: 'Cauzione Danni', transaction_type: 'stay_balance', notes: "Cauzione danni — cash all'arrivo, restituita al check-out", staff_member_id: defaultStaffId, created_at: new Date(checkInDate).toISOString() });

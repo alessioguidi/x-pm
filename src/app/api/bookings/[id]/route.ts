@@ -234,12 +234,60 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                   staff_member_id: booking.properties?.default_cleaning_staff_id || null,
                   notes: "Spese pulizie"
                 });
-               if (payments.length > 0) {
-                   await supabase.from('booking_payments').insert(payments);
-               }
-           }
-       } catch (e) {
-           console.error("Error creating scheduled payments on confirm", e);
+                if (payments.length > 0) {
+                    await supabase.from('booking_payments').insert(payments);
+                }
+            }
+        } catch (e) {
+            console.error("Error creating scheduled payments on confirm", e);
+         }
+
+        // 3. Genera anche la Prima Nota (cash_transactions) se non esistono movimenti
+        try {
+            const { count: ctCount } = await supabase.from('cash_transactions').select('*', { count: 'exact', head: true }).eq('booking_id', booking.id);
+            if (ctCount === 0) {
+                const orgId = org.id;
+                const propId = booking.property_id;
+                const bId = booking.id;
+                const cleaningFee = Number(booking.cleaning_fee) || 0;
+                const saldoAmount = Number(booking.total_price) - (Number(booking.down_payment) || 0) - cleaningFee;
+                const primaNota: any[] = [];
+                if (Number(booking.down_payment) > 0) primaNota.push({
+                    organization_id: orgId, property_id: propId, booking_id: bId, amount: Number(booking.down_payment),
+                    status: 'scheduled', payment_method: 'Bonifico', reason: 'Caparra', transaction_type: 'deposit_collection',
+                    notes: `Caparra (${booking.properties?.deposit_percentage || 0}%) — da versare anticipatamente`,
+                    created_at: new Date().toISOString()
+                });
+                if (saldoAmount > 0) primaNota.push({
+                    organization_id: orgId, property_id: propId, booking_id: bId, amount: saldoAmount,
+                    status: 'scheduled', payment_method: 'Bonifico', reason: 'Saldo', transaction_type: 'stay_balance',
+                    notes: 'Saldo soggiorno — da versare prima dell\'arrivo',
+                    created_at: new Date().toISOString()
+                });
+                if (cleaningFee > 0) primaNota.push({
+                    organization_id: orgId, property_id: propId, booking_id: bId, amount: cleaningFee,
+                    status: 'scheduled', payment_method: 'Contante', reason: 'Pulizie', transaction_type: 'stay_balance',
+                    notes: 'Spese pulizie e biancheria — da incassare a parte',
+                    created_at: booking.check_in_date ? new Date(booking.check_in_date).toISOString() : new Date().toISOString()
+                });
+                if (Number(booking.security_deposit) > 0 && booking.properties?.deposit_method !== 'stripe') primaNota.push({
+                    organization_id: orgId, property_id: propId, booking_id: bId, amount: Number(booking.security_deposit),
+                    status: 'scheduled', payment_method: 'Contante', reason: 'Cauzione Danni', transaction_type: 'stay_balance',
+                    notes: "Cauzione danni — cash all'arrivo, restituita al check-out",
+                    staff_member_id: booking.properties?.default_checkin_staff_id || null,
+                    created_at: booking.check_in_date ? new Date(booking.check_in_date).toISOString() : new Date().toISOString()
+                });
+                if (Number(booking.city_tax) > 0) primaNota.push({
+                    organization_id: orgId, property_id: propId, booking_id: bId, amount: Number(booking.city_tax),
+                    status: 'scheduled', payment_method: 'Contante', reason: 'Tassa Soggiorno', transaction_type: 'stay_balance',
+                    notes: "Tassa di soggiorno — cash all'arrivo",
+                    staff_member_id: booking.properties?.default_checkin_staff_id || null,
+                    created_at: booking.check_in_date ? new Date(booking.check_in_date).toISOString() : new Date().toISOString()
+                });
+                if (primaNota.length > 0) await supabase.from('cash_transactions').insert(primaNota);
+            }
+        } catch (e) {
+            console.error("Error creating prima nota on confirm", e);
         }
      }
 

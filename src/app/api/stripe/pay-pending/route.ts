@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     const { data: pending } = await supabase
-      .from("booking_payments")
+      .from("cash_transactions")
       .select("*")
       .eq("booking_id", booking_id)
       .eq("status", "scheduled");
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     }
 
     const reason = due.map(p => p.reason || "Pagamento").join(" + ");
+    const txIds = due.map(p => p.id).join(",");
 
     const pi = await stripe.paymentIntents.create({
       amount: Math.round(total * 100),
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
         organization_id: booking.organization_id || "",
         property_id: booking.property_id || "",
         booking_id: booking.id,
+        tx_ids: txIds,
         guest_name: booking.guest_name || "",
         guest_email: booking.guest_email || "",
         reason,
