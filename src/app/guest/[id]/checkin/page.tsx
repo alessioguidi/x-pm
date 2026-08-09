@@ -162,6 +162,8 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
     fetchBooking();
   }, [bookingId]);
 
+  const totalGuests = (booking?.adults_count || 0) + (booking?.children_count || 0) || booking?.guests_count || 1;
+
   const uploadFile = async (file: File): Promise<string | null> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${bookingId}_${Date.now()}_${Math.random()}.${fileExt}`;
@@ -253,7 +255,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
       setEditingGuestId(null);
       setShowNewForm(false);
 
-      if (guests && booking?.guests_count && guests.length >= booking.guests_count) {
+      if (guests && booking?.guests_count && guests.length >= totalGuests) {
         setCompleted(true);
       }
     } catch(err: any) {
@@ -313,8 +315,9 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                   <div className="font-bold"><Calendar className="inline w-3.5 h-3.5 mr-1" /> {formatDateRange(booking.check_in_date, booking.check_out_date)}</div>
                </div>
                <div className="pt-2 md:pt-0 md:pl-4">
-                  <div className="text-blue-200 text-xs uppercase font-bold tracking-wider">Avanzamento</div>
-                  <div className="font-bold">{addedCount} / {booking.guests_count} Ospiti Inseriti</div>
+                  <div className="text-blue-200 text-xs uppercase font-bold tracking-wider">Ospiti Da Registrare</div>
+                  <div className="font-bold">{addedCount} / {totalGuests}</div>
+                  <div className="text-blue-100 text-xs">Adulti: {booking.adults_count || 1} | Bambini: {booking.children_count || 0}</div>
                </div>
              </div>
           </div>
@@ -376,7 +379,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                 </div>
               ))}
             </div>
-            {addedCount < (booking.guests_count || 99) && (
+            {addedCount < totalGuests && (
               <button
                 onClick={() => {
                   setForm(initialForm());
@@ -558,7 +561,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
              )}
              <button type="submit" disabled={isSubmitting} className={`${editingGuestId ? 'flex-1' : 'w-full'} bg-gray-900 text-white font-bold text-lg py-4 rounded-xl hover:bg-black transition shadow-lg flex items-center justify-center disabled:opacity-50`}>
                {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin mr-2"/> : <CheckCircle2 className="w-6 h-6 mr-2"/>}
-               {isSubmitting ? 'Salvataggio...' : editingGuestId ? 'Salva Modifiche' : `Conferma e Aggiungi Ospite (${addedCount + 1}/${booking.guests_count})`}
+               {isSubmitting ? 'Salvataggio...' : editingGuestId ? 'Salva Modifiche' : `Conferma e Aggiungi Ospite (${addedCount + 1}/${totalGuests})`}
              </button>
            </div>
         </form>

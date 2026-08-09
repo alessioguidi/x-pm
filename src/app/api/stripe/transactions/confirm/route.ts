@@ -39,6 +39,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Pagamento riuscito: registra i booking_payments in sospeso come incassati
+    if (pi.status === "succeeded" && pi.metadata?.booking_id) {
+      const { error: bpError } = await supabase
+        .from("booking_payments")
+        .update({ status: "completed", payment_method: "Stripe" })
+        .eq("booking_id", pi.metadata.booking_id)
+        .eq("status", "scheduled");
+      if (bpError) console.error("[stripe/transactions/confirm] booking_payments update failed", bpError);
+    }
+
     return NextResponse.json({ success: true, status: newStatus, transaction: data || null });
   } catch (err: any) {
     console.error("[stripe/transactions/confirm]", err);

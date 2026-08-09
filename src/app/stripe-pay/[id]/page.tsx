@@ -156,6 +156,11 @@ export default function StripePayPage({ params }: { params: Promise<{ id: string
           <h2 className="text-xl font-bold text-gray-900 mb-2">Pagamento {statusLabels[piInfo?.status] || piInfo?.status}</h2>
           <p className="text-gray-600 font-medium">{piInfo?.reason || "Cauzione Danni"}</p>
           <p className="text-gray-500">Importo: €{piInfo?.amount?.toFixed(2)}</p>
+          {piInfo?.booking?.id && isSuccess && (
+            <a href={`/guest/${piInfo.booking.id}`} className="mt-6 inline-flex items-center gap-1 text-blue-600 font-bold hover:underline text-sm">
+              <Home className="w-3.5 h-3.5" /> Torna al portale ospite
+            </a>
+          )}
         </div>
       </div>
     );

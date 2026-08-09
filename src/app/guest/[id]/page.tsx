@@ -3,7 +3,7 @@
 import { useState, useEffect, use, Suspense } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, Home, CalendarDays, Users, Wifi, LogIn, LogOut, Utensils, Landmark, Phone, MapPin, BookOpen, DoorOpen, ShieldCheck, Hourglass } from "lucide-react";
+import { Loader2, Home, CalendarDays, Users, Wifi, LogIn, LogOut, Utensils, Landmark, Phone, MapPin, BookOpen, DoorOpen, ShieldCheck, Hourglass, CreditCard, Lock } from "lucide-react";
 import { addDays, parseISO, startOfDay, isAfter, format } from "date-fns";
 
 export default function GuestPortalWrapper({ params }: { params: Promise<{ id: string }> }) {
@@ -20,6 +20,9 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pendingPayments, setPendingPayments] = useState<any[]>([]);
+  const [registeredGuests, setRegisteredGuests] = useState(0);
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -34,9 +37,21 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
       } else {
         setBooking(data);
       }
+
+      const [pmtRes, guestsRes] = await Promise.all([
+        supabase.from("booking_payments").select("*").eq("booking_id", bookingId).eq("status", "scheduled"),
+        supabase.from("booking_guests").select("id", { count: "exact", head: true }).eq("booking_id", bookingId),
+      ]);
+      setPendingPayments((pmtRes.data || []).filter(p => Number(p.amount) > 0));
+      setRegisteredGuests(guestsRes.count || 0);
+
       setLoading(false);
     }
     fetchData();
+
+    const onFocus = () => fetchData();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [bookingId]);
 
   if (loading) {
@@ -71,8 +86,33 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
   const expiresAt = booking.check_out_date ? addDays(startOfDay(parseISO(booking.check_out_date)), expiresDays) : null;
   const isExpired = expiresAt ? isAfter(startOfDay(new Date()), expiresAt) : false;
 
+  const totalGuests = (booking.adults_count || 0) + (booking.children_count || 0) || booking.guests_count || 1;
+  const depositMethod = prop?.deposit_method || "cash";
+  const duePayments = pendingPayments.filter(p => !(p.reason === "Cauzione Danni" && depositMethod === "stripe"));
+  const pendingTotal = duePayments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const checkInCompleted = registeredGuests >= totalGuests;
+
   const showCheckIn = booking.status !== 'cancelled';
   const showCheckOut = booking.status !== 'cancelled' && booking.checkout_submitted_at === null;
+  const checkInEnabled = showCheckIn;
+  const checkOutEnabled = showCheckOut && pendingTotal <= 0 && checkInCompleted;
+
+  const handlePay = async () => {
+    setPaying(true);
+    try {
+      const res = await fetch("/api/stripe/pay-pending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Errore durante la creazione del pagamento");
+      router.push(data.payment_link);
+    } catch (err: any) {
+      setPaying(false);
+      alert(err.message || "Errore durante la creazione del pagamento");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
@@ -135,24 +175,65 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
                 </div>
                 <div>
                   <div className="text-xs text-gray-400 font-semibold uppercase">Ospiti</div>
-                  <div className="font-bold text-gray-900 mt-0.5">{booking.guests_count}</div>
+                  <div className="font-bold text-gray-900 mt-0.5">
+                    {booking.children_count
+                      ? `${booking.adults_count || 0} Adulti • ${booking.children_count} ${booking.children_count === 1 ? "Bambino" : "Bambini"}`
+                      : `${booking.guests_count || 0} Ospiti`}
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* PAGAMENTI IN SOSPESO */}
+            {pendingTotal > 0 && (
+              <div className="bg-white shadow-sm border-2 border-amber-200 rounded-2xl p-6">
+                <div className="flex items-center gap-3 border-b pb-4 mb-4">
+                  <CreditCard className="w-6 h-6 text-amber-600" />
+                  <h2 className="text-lg font-bold text-gray-900">Pagamenti da Saldare</h2>
+                </div>
+                <div className="space-y-2 mb-5">
+                  {duePayments.map(p => (
+                    <div key={p.id} className="flex items-center justify-between text-sm p-3 bg-amber-50 rounded-xl">
+                      <span className="font-medium text-gray-700">{p.reason || "Pagamento"}</span>
+                      <span className="font-bold text-gray-900">{Number(p.amount).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between text-sm p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <span className="font-bold text-gray-800">Totale</span>
+                    <span className="font-black text-lg text-gray-900">{pendingTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={handlePay}
+                  disabled={paying}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-2xl transition shadow-lg flex items-center justify-center disabled:opacity-50"
+                >
+                  {paying ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : <CreditCard className="w-6 h-6 mr-2" />}
+                  {paying ? "Creazione pagamento..." : "Paga"}
+                </button>
+                <p className="text-xs text-gray-400 text-center mt-3">
+                  Paga online ora o salda le spese all'arrivo.
+                </p>
+              </div>
+            )}
+
             {/* CHECK-IN / CHECK-OUT */}
             <div className="grid grid-cols-2 gap-4">
               <a
-                href={`/guest/${booking.id}/checkin`}
-                className={`bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition shadow-lg flex items-center justify-center ${showCheckIn ? '' : 'opacity-40 pointer-events-none'}`}
+                href={checkInEnabled ? `/guest/${booking.id}/checkin` : undefined}
+                onClick={e => { if (!checkInEnabled) e.preventDefault(); }}
+                className={`${checkInEnabled ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'} text-white font-bold py-4 rounded-2xl transition flex items-center justify-center ${checkInEnabled ? 'shadow-lg' : 'opacity-70'}`}
+                title={checkInEnabled ? undefined : "Prenotazione annullata"}
               >
-                <LogIn className="w-6 h-6 mr-2" /> Check-in
+                {checkInEnabled ? <LogIn className="w-6 h-6 mr-2" /> : <Lock className="w-6 h-6 mr-2" />} Check-in
               </a>
               <a
-                href={`/guest/${booking.id}/checkout`}
-                className={`bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-2xl transition shadow-lg flex items-center justify-center ${showCheckOut ? '' : 'opacity-40 pointer-events-none'}`}
+                href={checkOutEnabled ? `/guest/${booking.id}/checkout` : undefined}
+                onClick={e => { if (!checkOutEnabled) e.preventDefault(); }}
+                className={`${checkOutEnabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-gray-300 cursor-not-allowed'} text-white font-bold py-4 rounded-2xl transition flex items-center justify-center ${checkOutEnabled ? 'shadow-lg' : 'opacity-70'}`}
+                title={checkOutEnabled ? undefined : !checkInCompleted ? "Il check-out si attiva dopo aver completato il check-in" : "Completa il check-in per attivare il check-out"}
               >
-                <LogOut className="w-6 h-6 mr-2" /> Check-out
+                {checkOutEnabled ? <LogOut className="w-6 h-6 mr-2" /> : <Lock className="w-6 h-6 mr-2" />} Check-out
               </a>
             </div>
 

@@ -23,7 +23,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // Fetch booking
     const { data: booking, error: bkError } = await supabase
       .from('bookings')
-      .select('*, properties(name, deposit_percentage, default_checkin_staff_id, default_cleaning_staff_id, notification_emails), organizations(*)')
+      .select('*, properties(name, deposit_percentage, default_checkin_staff_id, default_cleaning_staff_id, notification_emails, deposit_method), organizations(*)')
       .eq('id', id)
       .single();
 
@@ -216,24 +216,24 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                  payment_method: 'Bonifico', reason: 'Caparra',
                  notes: `Caparra (${booking.properties?.deposit_percentage || 0}%) — da versare anticipatamente`
                });
-               if (Number(booking.security_deposit) > 0) payments.push({
-                 booking_id: booking.id, amount: Number(booking.security_deposit), status: 'scheduled',
-                 payment_method: 'Contante', reason: 'Cauzione Danni', payment_date: booking.check_in_date,
-                 staff_member_id: booking.properties?.default_checkin_staff_id || null,
-                 notes: "Cauzione danni — cash all'arrivo"
-               });
-               if (Number(booking.city_tax) > 0) payments.push({
-                 booking_id: booking.id, amount: Number(booking.city_tax), status: 'scheduled',
-                 payment_method: 'Contante', reason: 'Tassa Soggiorno', payment_date: booking.check_in_date,
-                 staff_member_id: booking.properties?.default_checkin_staff_id || null,
-                 notes: "Tassa di soggiorno — cash all'arrivo"
-               });
-               if (Number(booking.cleaning_fee) > 0) payments.push({
-                 booking_id: booking.id, amount: Number(booking.cleaning_fee), status: 'scheduled',
-                 payment_method: 'Contante', reason: 'Pulizie', payment_date: booking.check_in_date,
-                 staff_member_id: booking.properties?.default_cleaning_staff_id || null,
-                 notes: "Spese pulizie"
-               });
+                if (Number(booking.security_deposit) > 0 && booking.properties?.deposit_method !== 'stripe') payments.push({
+                  booking_id: booking.id, amount: Number(booking.security_deposit), status: 'scheduled',
+                  payment_method: 'Contante', reason: 'Cauzione Danni', date: booking.check_in_date,
+                  staff_member_id: booking.properties?.default_checkin_staff_id || null,
+                  notes: "Cauzione danni — cash all'arrivo"
+                });
+                if (Number(booking.city_tax) > 0) payments.push({
+                  booking_id: booking.id, amount: Number(booking.city_tax), status: 'scheduled',
+                  payment_method: 'Contante', reason: 'Tassa Soggiorno', date: booking.check_in_date,
+                  staff_member_id: booking.properties?.default_checkin_staff_id || null,
+                  notes: "Tassa di soggiorno — cash all'arrivo"
+                });
+                if (Number(booking.cleaning_fee) > 0) payments.push({
+                  booking_id: booking.id, amount: Number(booking.cleaning_fee), status: 'scheduled',
+                  payment_method: 'Contante', reason: 'Pulizie', date: booking.check_in_date,
+                  staff_member_id: booking.properties?.default_cleaning_staff_id || null,
+                  notes: "Spese pulizie"
+                });
                if (payments.length > 0) {
                    await supabase.from('booking_payments').insert(payments);
                }
