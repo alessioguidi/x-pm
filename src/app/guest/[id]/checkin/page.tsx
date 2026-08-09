@@ -401,11 +401,13 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
           </div>
           <div className="relative z-10">
              <div className="flex items-center gap-3 mb-1">
-               {booking.properties?.logo_url ? (
-                 <img src={booking.properties.logo_url} alt="Logo struttura" className="w-10 h-10 rounded-full bg-white/20 object-cover border border-white/40" />
-               ) : (
-                 <Home className="w-10 h-10 opacity-80" />
-               )}
+                {booking.properties?.logo_url ? (
+                  <div className="w-14 h-14 rounded-2xl bg-white p-2 flex items-center justify-center shrink-0">
+                    <img src={booking.properties.logo_url} alt="Logo struttura" className="w-full h-full object-contain" />
+                  </div>
+                ) : (
+                  <Home className="w-10 h-10 opacity-80" />
+                )}
                <h1 className="text-2xl font-extrabold">Registrazione Ospiti</h1>
              </div>
              <p className="text-blue-100 font-medium opacity-90"><MapPin className="inline w-4 h-4 mr-1"/> {booking.properties?.name}</p>

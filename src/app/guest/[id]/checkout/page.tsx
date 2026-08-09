@@ -155,7 +155,9 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
             <ArrowLeft className="w-3.5 h-3.5" /> Torna al portal
           </a>
           {booking.properties?.logo_url ? (
-            <img src={booking.properties.logo_url} alt="Logo struttura" className="w-10 h-10 mb-2 rounded-full bg-white/20 object-cover border border-white/40" />
+            <div className="w-14 h-14 mb-2 rounded-2xl bg-white p-2 flex items-center justify-center">
+              <img src={booking.properties.logo_url} alt="Logo struttura" className="w-full h-full object-contain" />
+            </div>
           ) : (
             <Home className="w-10 h-10 mb-2 opacity-80" />
           )}
