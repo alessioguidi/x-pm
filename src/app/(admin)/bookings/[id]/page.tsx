@@ -51,7 +51,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     // Booking
     const { data: bk, error: bkError } = await supabase
       .from('bookings')
-      .select('*, properties(name), organizations(allowed_payment_methods), contacts(*)')
+      .select('*, properties(name, cir, cin, bedrooms, max_guests), organizations(allowed_payment_methods), contacts(*)')
       .eq('id', id)
       .single();
     if (bk) {
@@ -231,53 +231,237 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
      }
   };
 
-  const downloadRossXML = () => {
-     if (!booking || !bookingGuests.length) return toast.error("Nessun ospite registrato.");
-     const checkinStr = booking.check_in_date.replace(/-/g, ''); // 20260411
+   const downloadRossXML = () => {
+      if (!booking || !bookingGuests.length) return toast.error("Nessun ospite registrato.");
+      const checkinStr = booking.check_in_date.replace(/-/g, ''); // 20260411
+      const checkoutStr = booking.check_out_date ? booking.check_out_date.replace(/-/g, '') : checkinStr;
 
-     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<movimenti>\n<codice>CODICE_STRUTTURA</codice>\n<prodotto>AltamiraRMS</prodotto>\n`;
-     xml += `<movimento>\n<data>${checkinStr}</data>\n`;
-     xml += `<struttura>\n<apertura>SI</apertura>\n<camereoccupate>1</camereoccupate>\n<cameredisponibili>1</cameredisponibili>\n<lettidisponibili>${booking.guests_count}</lettidisponibili>\n</struttura>\n`;
-     xml += `<arrivi>\n`;
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<movimenti>\n<codice>${booking.properties?.cir || booking.properties?.cin || 'CODICE_STRUTTURA'}</codice>\n<prodotto>X-PM</prodotto>\n`;
 
-     let capoId = "";
-     bookingGuests.forEach(g => {
-         if (["16", "17", "18"].includes(g.type)) capoId = g.id.substring(0, 18).replace(/-/g, '');
-     });
+      const struttura = `<struttura>\n<apertura>SI</apertura>\n<camereoccupate>1</camereoccupate>\n<cameredisponibili>${booking.properties?.bedrooms || 1}</cameredisponibili>\n<lettidisponibili>${booking.properties?.max_guests || booking.guests_count}</lettidisponibili>\n</struttura>\n`;
 
-     bookingGuests.forEach(g => {
+      xml += `<movimento>\n<data>${checkinStr}</data>\n`;
+      xml += struttura;
+      xml += `<arrivi>\n`;
+
+      let capoId = "";
+      bookingGuests.forEach(g => {
+          if (["16", "17", "18"].includes(g.type)) capoId = g.id.substring(0, 18).replace(/-/g, '');
+      });
+
+      bookingGuests.forEach(g => {
+          const isLeader = ["16", "17", "18"].includes(g.type);
+          const idswh = g.id.substring(0, 18).replace(/-/g, '');
+          const capoRef = isLeader ? "" : `<idcapo>${capoId}</idcapo>`;
+          const bDate = g.birth_date.replace(/-/g, '');
+          
+          xml += `  <arrivo>\n`;
+          xml += `    <idswh>${idswh}</idswh>\n`;
+          xml += `    <tipoalloggiato>${g.type}</tipoalloggiato>\n`;
+          if (!isLeader) xml += `    ${capoRef}\n`;
+          xml += `    <cognome>${g.last_name.substring(0, 50)}</cognome>\n`;
+          xml += `    <nome>${g.first_name.substring(0, 30)}</nome>\n`;
+          xml += `    <sesso>${g.gender}</sesso>\n`;
+          xml += `    <cittadinanza>${g.citizenship}</cittadinanza>\n`;
+          xml += `    <statoresidenza>${g.residence_country}</statoresidenza>\n`;
+          if (g.residence_city) xml += `    <luogoresidenza>${(g.residence_country === "100000100" && g.residence_city_code) || g.residence_city}</luogoresidenza>\n`;
+          xml += `    <datanascita>${bDate}</datanascita>\n`;
+          if (g.birth_country && g.birth_country === "100000100") xml += `    <statonascita>${g.birth_country}</statonascita>\n`;
+          if (g.birth_city && g.birth_country === "100000100") xml += `    <comunenascita>${g.birth_city_code || g.birth_city}</comunenascita>\n`;
+          xml += `    <tipoturismo>Altro motivo</tipoturismo>\n`;
+          xml += `    <mezzotrasporto>Auto</mezzotrasporto>\n`;
+          xml += `    <canaleprenotazione>Non specificato</canaleprenotazione>\n`;
+          xml += `  </arrivo>\n`;
+      });
+
+      xml += `</arrivi>\n</movimento>\n`;
+
+      // Partenze: stesso idswh, inviate nel giorno di check-out
+      xml += `<movimento>\n<data>${checkoutStr}</data>\n`;
+      xml += struttura;
+      xml += `<partenze>\n`;
+      bookingGuests.forEach(g => {
+          xml += `  <partenza>\n`;
+          xml += `    <idswh>${g.id.substring(0, 18).replace(/-/g, '')}</idswh>\n`;
+          xml += `    <tipoalloggiato>${g.type}</tipoalloggiato>\n`;
+          xml += `    <arrivo>${checkinStr}</arrivo>\n`;
+          xml += `  </partenza>\n`;
+      });
+      xml += `</partenze>\n</movimento>\n</movimenti>`;
+
+      const blob = new Blob([xml], { type: 'text/xml' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ross1000_${checkinStr}_${booking.id.substring(0,8)}.xml`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+   };
+
+   const pad = (s: string | null | undefined, len: number) => (s || "").substring(0, len).padEnd(len, " ");
+
+   // File AlloggiatiWeb (Questura) — testo fisso, 168 caratteri a riga + CRLF (tranne ultima)
+   const downloadAlloggiatiTxt = async () => {
+      if (!booking || !bookingGuests.length) return toast.error("Nessun ospite registrato.");
+
+      const fmtDate = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
+      const checkin = fmtDate(booking.check_in_date);
+      const nights = Math.max(1, Math.min(30, Math.round((new Date(booking.check_out_date).getTime() - new Date(booking.check_in_date).getTime()) / 86400000)));
+
+      // Cerca le province dei comuni di nascita, residenza e rilascio documento
+      const codes = new Set<string>();
+      bookingGuests.forEach(g => {
+         if (g.birth_country === "100000100" && g.birth_city_code) codes.add(g.birth_city_code);
+         if (g.residence_country === "100000100" && g.residence_city_code) codes.add(g.residence_city_code);
+         if (g.document_issue_country === "100000100" && g.document_issue_city_code) codes.add(g.document_issue_city_code);
+      });
+      let provMap: Record<string, string> = {};
+      if (codes.size) {
+         const { data: comuni } = await supabase.from('comuni_istat').select('codice, provincia').in('codice', Array.from(codes));
+         if (comuni) comuni.forEach(c => { provMap[c.codice] = c.provincia || ""; });
+      }
+
+      // Il manuale richiede che i capi (16/17/18) vengano prima dei componenti del gruppo
+      const orderedGuests = [...bookingGuests].sort((a, b) => {
+         const aLeader = ["16", "17", "18"].includes(a.type) ? 0 : 1;
+         const bLeader = ["16", "17", "18"].includes(b.type) ? 0 : 1;
+         return aLeader - bLeader;
+      });
+
+      const rows: string[] = [];
+      for (const g of orderedGuests) {
          const isLeader = ["16", "17", "18"].includes(g.type);
-         const idswh = g.id.substring(0, 18).replace(/-/g, '');
-         const capoRef = isLeader ? "" : `<idcapo>${capoId}</idcapo>`;
-         const bDate = g.birth_date.replace(/-/g, '');
-         
-         xml += `  <arrivo>\n`;
-         xml += `    <idswh>${idswh}</idswh>\n`;
-         xml += `    <tipoalloggiato>${g.type}</tipoalloggiato>\n`;
-         if (!isLeader) xml += `    ${capoRef}\n`;
-         xml += `    <sesso>${g.gender}</sesso>\n`;
-         xml += `    <cittadinanza>${g.citizenship}</cittadinanza>\n`;
-         xml += `    <statoresidenza>${g.residence_country}</statoresidenza>\n`;
-         if (g.residence_city) xml += `    <luogoresidenza>${g.residence_city}</luogoresidenza>\n`;
-         xml += `    <datanascita>${bDate}</datanascita>\n`;
-         if (g.birth_country && g.birth_country === "100000100") xml += `    <statonascita>${g.birth_country}</statonascita>\n`;
-         if (g.birth_city && g.birth_country === "100000100") xml += `    <comunenascita>${g.birth_city}</comunenascita>\n`;
-         xml += `    <tipoturismo>Altro motivo</tipoturismo>\n`;
-         xml += `    <mezzotrasporto>Auto</mezzotrasporto>\n`;
-         xml += `    <canaleprenotazione>Diretta web</canaleprenotazione>\n`;
-         xml += `  </arrivo>\n`;
-     });
+         if (isLeader && !g.document_type) return toast.error(`Ospite ${g.last_name} ${g.first_name}: tipo documento mancante.`);
+         if (isLeader && !g.document_number) return toast.error(`Ospite ${g.last_name} ${g.first_name}: numero documento mancante.`);
+         if (isLeader && g.document_issue_country === "100000100" && !g.document_issue_city_code) return toast.error(`Ospite ${g.last_name} ${g.first_name}: comune di rilascio documento mancante.`);
+         if (isLeader && g.document_issue_country !== "100000100" && !g.document_issue_country) return toast.error(`Ospite ${g.last_name} ${g.first_name}: stato di rilascio documento mancante.`);
+         const sesso = g.gender === "F" ? "2" : "1";
+         const bornItaly = g.birth_country === "100000100";
+         if (bornItaly && !g.birth_city_code) return toast.error(`Ospite ${g.last_name} ${g.first_name}: comune di nascita mancante (richiesto per nati in Italia).`);
+         const comuneNascita = bornItaly ? pad(g.birth_city_code, 9) : " ".repeat(9);
+         const provNascita = bornItaly ? pad(provMap[g.birth_city_code], 2) : "  ";
 
-     xml += `</arrivi>\n</movimento>\n</movimenti>`;
+         const docType = isLeader ? pad(g.document_type, 5) : " ".repeat(5);
+         const docNum = isLeader ? pad(g.document_number, 20) : " ".repeat(20);
+         const luogoRilascio = isLeader
+            ? (g.document_issue_country === "100000100" ? pad(g.document_issue_city_code, 9) : pad(g.document_issue_country, 9))
+            : " ".repeat(9);
 
-     const blob = new Blob([xml], { type: 'text/xml' });
-     const url = window.URL.createObjectURL(blob);
-     const a = document.createElement('a');
-     a.href = url;
-     a.download = `ross1000_${checkinStr}_${booking.id.substring(0,8)}.xml`;
-     a.click();
-     window.URL.revokeObjectURL(url);
-  };
+         const line =
+            pad(g.type, 2) +                             // 0-1  Tipo Alloggiato
+            checkin +                                    // 2-11 Data Arrivo gg/mm/aaaa
+            String(nights).padStart(2, "0") +            // 12-13 Numero Giorni Permanenza
+            pad(g.last_name, 50) +                       // 14-63 Cognome
+            pad(g.first_name, 30) +                      // 64-93 Nome
+            sesso +                                      // 94   Sesso 1(M) 2(F)
+            fmtDate(g.birth_date) +                      // 95-104 Data Nascita
+            comuneNascita +                              // 105-113 Comune Nascita
+            provNascita +                                // 114-115 Provincia Nascita
+            pad(g.birth_country, 9) +                    // 116-124 Stato Nascita
+            pad(g.citizenship, 9) +                      // 125-133 Cittadinanza
+            docType +                                    // 134-138 Tipo Documento
+            docNum +                                     // 139-158 Numero Documento
+            luogoRilascio;                               // 159-167 Luogo Rilascio Documento
+         rows.push(line);
+      }
+
+      const content = rows.join("\r\n");
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `alloggiati_${booking.check_in_date.replace(/-/g, '')}_${booking.id.substring(0,8)}.txt`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+   };
+
+   // File Ross1000 TXT (tracciato v4, 26 campi a lunghezza fissa) — residenza per tutti, documento per i capi, campi Istat
+   const downloadRossTxt = async () => {
+      if (!booking || !bookingGuests.length) return toast.error("Nessun ospite registrato.");
+
+      const fmtDate = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
+      const checkin = fmtDate(booking.check_in_date);
+      const checkout = booking.check_out_date ? fmtDate(booking.check_out_date) : "";
+
+      const codes = new Set<string>();
+      bookingGuests.forEach(g => {
+         if (g.birth_country === "100000100" && g.birth_city_code) codes.add(g.birth_city_code);
+         if (g.residence_country === "100000100" && g.residence_city_code) codes.add(g.residence_city_code);
+      });
+      let provMap: Record<string, string> = {};
+      if (codes.size) {
+         const { data: comuni } = await supabase.from('comuni_istat').select('codice, provincia').in('codice', Array.from(codes));
+         if (comuni) comuni.forEach(c => { provMap[c.codice] = c.provincia || ""; });
+      }
+
+      const camereDisp = String(booking.properties?.bedrooms || 1).padStart(3, "0");
+      const lettiDisp = String(booking.properties?.max_guests || booking.guests_count || 1).padStart(4, "0");
+      const tassa = Number(booking.tax_amount || 0) > 0 ? "1" : "0";
+      const codStruttura = (booking.properties?.cir || booking.properties?.cin || "STRUTTURA").replace(/[^A-Za-z0-9]/g, "");
+
+      const rows: string[] = [];
+      for (const g of bookingGuests) {
+         const isLeader = ["16", "17", "18"].includes(g.type);
+         const sesso = g.gender === "F" ? "2" : "1";
+         const bornItaly = g.birth_country === "100000100";
+         const resItaly = g.residence_country === "100000100";
+         const comuneNascita = bornItaly ? pad(g.birth_city_code, 9) : " ".repeat(9);
+         const provNascita = bornItaly ? pad(provMap[g.birth_city_code], 2) : "  ";
+         const comuneResidenza = resItaly ? pad(g.residence_city_code, 9) : " ".repeat(9);
+         const provResidenza = resItaly ? pad(provMap[g.residence_city_code], 2) : "  ";
+
+         const docType = isLeader ? pad(g.document_type, 5) : " ".repeat(5);
+         const docNum = isLeader ? pad(g.document_number, 20) : " ".repeat(20);
+         const luogoRilascio = isLeader
+            ? (g.document_issue_country === "100000100" ? pad(g.document_issue_city_code, 9) : pad(g.document_issue_country, 9))
+            : " ".repeat(9);
+
+         const camereOcc = isLeader ? "001" : " ".repeat(3);
+         const camereDispStr = isLeader ? camereDisp : " ".repeat(3);
+         const lettiDispStr = isLeader ? lettiDisp : " ".repeat(4);
+
+         // Codice identificativo posizione (10 char, univoco e stabile)
+         const posId = g.id.substring(0, 18).replace(/-/g, '').substring(0, 10);
+
+         const line =
+            pad(g.type, 2) +                          // 1  Tipo Alloggiato
+            checkin +                                 // 2  Data arrivo gg/mm/aaaa
+            pad(g.last_name, 50) +                    // 3  Cognome
+            pad(g.first_name, 30) +                   // 4  Nome
+            sesso +                                   // 5  Sesso
+            fmtDate(g.birth_date) +                   // 6  Data nascita
+            comuneNascita +                           // 7  Codice comune nascita
+            provNascita +                             // 8  Provincia nascita
+            pad(g.birth_country, 9) +                 // 9  Stato nascita
+            pad(g.citizenship, 9) +                   // 10 Cittadinanza
+            comuneResidenza +                         // 11 Codice comune residenza
+            provResidenza +                           // 12 Provincia residenza
+            pad(g.residence_country, 9) +             // 13 Stato residenza
+            pad(g.residence_address, 50) +            // 14 Indirizzo
+            docType +                                 // 15 Tipo documento
+            docNum +                                  // 16 Numero documento
+            luogoRilascio +                           // 17 Luogo/Stato rilascio documento
+            checkout +                                // 18 Data partenza
+            pad("Non Specificato", 30) +              // 19 Tipo Turismo
+            pad("Auto", 30) +                         // 20 Mezzo di Trasporto
+            camereOcc +                               // 21 Camere occupate
+            camereDispStr +                           // 22 Camere disponibili
+            lettiDispStr +                            // 23 Letti disponibili
+            tassa +                                   // 24 Tassa soggiorno
+            pad(posId, 10) +                          // 25 Codice posizione
+            "1";                                      // 26 Modalità (1=Nuovo)
+         rows.push(line);
+      }
+
+      const content = rows.join("\r\n");
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${codStruttura}_${booking.check_in_date.replace(/-/g, '')}_${booking.id.substring(0,8)}.txt`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+   };
 
   if (loading) {
     return <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
@@ -461,7 +645,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                                <div className="flex justify-between items-start">
                                   <div>
                                      <p className="font-bold text-gray-800 text-sm mb-1">{g.last_name} {g.first_name} <span className="text-gray-400 font-normal">({g.gender})</span></p>
-                                     <p className="text-gray-500">Nato il: {formatDateStr(g.birth_date)} • Residenza: {g.residence_city || g.residence_country}</p>
+                                      <p className="text-gray-500">Nato il: {formatDateStr(g.birth_date)} • Residenza: {g.residence_city || g.residence_country}{g.residence_city_code ? ` (${g.residence_city_code})` : ""} • Tipo: {g.document_type || "-"}</p>
                                      {(g.document_front_url || g.document_back_url) && (
                                         <div className="mt-2 flex gap-2">
                                            {g.document_front_url && <a href={g.document_front_url} target="_blank" className="text-blue-600 font-bold hover:underline">Fronte C.I.</a>}
@@ -488,6 +672,12 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
                   <button onClick={downloadRossXML} disabled={bookingGuests.length === 0} className="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed">
                      <Download className="w-4 h-4 mr-2" /> Scarica Tracciato XML (Ross1000)
+                  </button>
+                  <button onClick={downloadAlloggiatiTxt} disabled={bookingGuests.length === 0} className="w-full mt-2 bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 rounded-lg flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed">
+                     <Download className="w-4 h-4 mr-2" /> Scarica File AlloggiatiWeb (Questura)
+                  </button>
+                  <button onClick={downloadRossTxt} disabled={bookingGuests.length === 0} className="w-full mt-2 bg-teal-700 hover:bg-teal-800 text-white font-bold py-3 rounded-lg flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed">
+                     <Download className="w-4 h-4 mr-2" /> Scarica File Ross1000 TXT (v4)
                   </button>
               </div>
 

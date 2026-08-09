@@ -170,6 +170,16 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                  <p className="text-gray-600">{property.cancellation_policy || "Contatta l'host per i dettagli."}</p>
               </div>
 
+              {(property.cir || property.cin) && (
+                <div className="col-span-1 md:col-span-2 pt-4 border-t border-gray-200">
+                  <h4 className="font-bold mb-1">Codici Identificativi</h4>
+                  <div className="flex flex-wrap gap-4 text-gray-600">
+                    {property.cir && <span>CIR: <span className="font-medium text-gray-800">{property.cir}</span></span>}
+                    {property.cin && <span>CIN: <span className="font-medium text-gray-800">{property.cin}</span></span>}
+                  </div>
+                </div>
+              )}
+
             </div>
 
           </div>

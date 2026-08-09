@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/utils/supabase/client";
-import { Building2, MapPin, Bed, Save, Edit3, X } from "lucide-react";
+import { Building2, MapPin, Bed, Save, Edit3, X, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
@@ -38,6 +38,8 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
     bedrooms: property.bedrooms || 1,
     max_guests: property.max_guests || 2,
     is_active: property.is_active || false,
+    cir: property.cir || "",
+    cin: property.cin || "",
     notification_emails: Array.isArray(property.notification_emails) ? (property.notification_emails as string[]) : [],
   });
 
@@ -109,6 +111,9 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
           <li className="flex items-center"><Building2 className="w-4 h-4 mr-2" /> SaaS: {property.organizations?.name}</li>
           <li className="flex items-center"><MapPin className="w-4 h-4 mr-2" /> {property.city}</li>
           <li className="flex items-center"><Bed className="w-4 h-4 mr-2" /> {property.bedrooms} Camere ({property.max_guests} Ospiti)</li>
+          {(property.cir || property.cin) && (
+            <li className="flex items-center text-gray-700"><ShieldCheck className="w-4 h-4 mr-2" /> CIR: {property.cir || "—"} {property.cin && <> • CIN: {property.cin}</>}</li>
+          )}
         </ul>
         <div className="mt-6 pt-4 border-t flex items-center justify-between">
           <div>
@@ -301,6 +306,23 @@ export default function PropertyDetailsEditor({ property }: { property: any }) {
             longitude={formData.longitude} 
             onChange={(lat, lng) => setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }))}
           />
+        </div>
+
+        <div className="pt-4 border-t mt-4 border-gray-100">
+          <h4 className="text-sm font-semibold mb-1 text-gray-900 flex items-center"><ShieldCheck className="w-4 h-4 mr-2 text-blue-600" /> Codici Identificativi</h4>
+          <p className="text-[11px] text-gray-500 mb-3 leading-tight">
+            CIR (Codice Identificativo Regionale) e CIN (Codice Identificativo Nazionale, obbligatorio per legge). Utilizzati per la trasmissione delle registrazioni ospiti.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700">Codice CIR</label>
+              <input type="text" placeholder="Es. 022222-ALT-00000" className="w-full border rounded p-2 text-sm text-gray-900 focus:ring-blue-500" value={formData.cir} onChange={e => setFormData({...formData, cir: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700">Codice CIN</label>
+              <input type="text" placeholder="Es. IT0123456789" className="w-full border rounded p-2 text-sm text-gray-900 focus:ring-blue-500" value={formData.cin} onChange={e => setFormData({...formData, cin: e.target.value})} />
+            </div>
+          </div>
         </div>
 
         <div className="pt-4 border-t flex justify-end">

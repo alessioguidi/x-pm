@@ -16,13 +16,16 @@ type GuestForm = {
   citizenship: string;
   birth_country: string;
   birth_city: string;
+  birth_city_code: string;
   residence_country: string;
   residence_city: string;
+  residence_city_code: string;
   residence_address: string;
   document_type: string;
   document_number: string;
   document_issue_country: string;
   document_issue_city: string;
+  document_issue_city_code: string;
   document_front_url: string;
   document_back_url: string;
   document_front_file: File | null;
@@ -54,8 +57,71 @@ const COMMON_COUNTRIES = [
   { code: "100000435", name: "Australia" },
 ];
 
-const initialForm = (): GuestForm => ({
-  type: "17",
+// Autocomplete comune italiano (codice ISTAT ufficiale per ross1000)
+function ComuneAutocomplete({ value, code, onChange }: { value: string; code: string; onChange: (name: string, codice: string) => void }) {
+  const [query, setQuery] = useState(value);
+  const [results, setResults] = useState<any[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (query.trim().length < 2) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from('comuni_istat')
+        .select('codice, descrizione, provincia')
+        .ilike('descrizione', `%${query.trim().toUpperCase()}%`)
+        .order('descrizione', { ascending: true })
+        .limit(12);
+      setResults(data || []);
+      setOpen(true);
+      setLoading(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        required
+        value={query}
+        onChange={e => { setQuery(e.target.value); onChange(e.target.value, ""); }}
+        onFocus={() => { if (results.length) setOpen(true); }}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        placeholder="Digita il comune..."
+        className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none"
+      />
+      {open && results.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full bg-white border-2 border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+          {results.map(r => (
+            <button
+              key={r.codice}
+              type="button"
+              onMouseDown={e => { e.preventDefault(); setQuery(r.descrizione); onChange(r.descrizione, r.codice); setOpen(false); }}
+              className={`w-full text-left px-4 py-2 hover:bg-blue-50 text-sm ${r.codice === code ? "bg-blue-50 font-bold" : ""}`}
+            >
+              {r.descrizione} ({r.provincia}) <span className="text-gray-400 text-xs ml-1">{r.codice}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {loading && <p className="text-xs text-gray-400 mt-1">Ricerca...</p>}
+      {code && <p className="text-xs text-green-600 font-bold mt-1">Codice: {code}</p>}
+    </div>
+  );
+}
+
+const initialForm = (): GuestForm => ({  type: "17",
   first_name: "",
   last_name: "",
   gender: "M",
@@ -63,13 +129,16 @@ const initialForm = (): GuestForm => ({
   citizenship: "100000100",
   birth_country: "100000100",
   birth_city: "",
+  birth_city_code: "",
   residence_country: "100000100",
   residence_city: "",
+  residence_city_code: "",
   residence_address: "",
-  document_type: "CARTA IDENTITA",
+  document_type: "IDENT",
   document_number: "",
   document_issue_country: "100000100",
   document_issue_city: "",
+  document_issue_city_code: "",
   document_front_url: "",
   document_back_url: "",
   document_front_file: null,
@@ -106,6 +175,11 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
   const [editingGuestId, setEditingGuestId] = useState<string | null>(null);
   // Quando l'utente vuole aggiungere un nuovo ospite dopo aver visto la lista
   const [showNewForm, setShowNewForm] = useState(false);
+  const [docTypes, setDocTypes] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.from('tipi_documento').select('codice, descrizione').order('descrizione').then(({ data }) => setDocTypes(data || []));
+  }, []);
 
   useEffect(() => {
     async function fetchBooking() {
@@ -142,9 +216,11 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
       if (editId) {
         const guestToEdit = registered.find(g => g.id === editId);
         if (guestToEdit) {
+          const legacyDocMap: Record<string, string> = { "CARTA IDENTITA": "IDENT", "PASSAPORTO": "PASOR", "PATENTE": "PATEN" };
           setForm({
             ...initialForm(),
             ...guestToEdit,
+            document_type: legacyDocMap[guestToEdit.document_type] || guestToEdit.document_type || "IDENT",
             document_front_file: null,
             document_back_file: null,
           });
@@ -160,11 +236,33 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
 
   const totalGuests = (booking?.adults_count || 0) + (booking?.children_count || 0) || booking?.guests_count || 1;
 
+  // Ridimensiona immagini prima dell'upload (max 1600px, jpeg q=0.8). I PDF restano invariati.
+  const resizeImage = async (file: File): Promise<File> => {
+    if (!file.type.startsWith("image/")) return file;
+    const MAX_DIM = 1600;
+    const bitmap = await createImageBitmap(file);
+    const ratio = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * ratio));
+    const h = Math.max(1, Math.round(bitmap.height * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) { bitmap.close(); return file; }
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.8));
+    if (!blob) return file;
+    const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg" });
+  };
+
   const uploadFile = async (file: File): Promise<string | null> => {
-    const fileExt = file.name.split('.').pop();
+    const resized = await resizeImage(file);
+    const fileExt = resized.name.split('.').pop();
     const fileName = `${bookingId}_${Date.now()}_${Math.random()}.${fileExt}`;
     const filePath = `documents/${fileName}`;
-    const { error } = await supabase.storage.from('guest_documents').upload(filePath, file);
+    const { error } = await supabase.storage.from('guest_documents').upload(filePath, resized, { contentType: resized.type });
     if (error) { console.error('Upload error:', error); return null; }
     const { data } = supabase.storage.from('guest_documents').getPublicUrl(filePath);
     return data.publicUrl;
@@ -186,6 +284,11 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
       if (["16", "17", "18"].includes(form.type)) {
         if (!form.document_front_file && !form.document_front_url) throw new Error("Documento fronte obbligatorio per Capofamiglia/Capogruppo/Singolo.");
       }
+
+      // Codici ufficiali Polizia per comuni italiani (ross1000 li richiede)
+      if (form.residence_country === "100000100" && !form.residence_city_code) throw new Error("Seleziona il comune di residenza dall'elenco (codice ISTAT obbligatorio).");
+      if (form.birth_country === "100000100" && form.birth_city && !form.birth_city_code) throw new Error("Seleziona il comune di nascita dall'elenco (codice ISTAT obbligatorio).");
+      if (!form.document_type) throw new Error("Seleziona il tipo di documento.");
       
       if (form.document_front_file) {
         const resUrl = await uploadFile(form.document_front_file);
@@ -208,20 +311,21 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
         citizenship: form.citizenship,
         birth_country: form.birth_country,
         birth_city: form.birth_city,
+        birth_city_code: form.birth_city_code,
         residence_country: form.residence_country,
         residence_city: form.residence_city,
+        residence_city_code: form.residence_city_code,
         residence_address: form.residence_address,
         document_type: form.document_type,
         document_number: form.document_number,
+        document_issue_country: form.document_issue_country,
+        document_issue_city: form.document_issue_city,
+        document_issue_city_code: form.document_issue_city_code,
       };
 
       // Solo se c'è un nuovo upload, aggiorna l'URL
       if (frontUrl) payload.document_front_url = frontUrl;
       if (backUrl) payload.document_back_url = backUrl;
-
-      // Preserva campi non presenti nel form ma esistenti nel DB
-      if (!form.document_issue_country) delete payload.document_issue_country;
-      if (!form.document_issue_city) delete payload.document_issue_city;
 
       if (editingGuestId) {
         const { error: dbError } = await supabase.from('booking_guests').update(payload).eq('id', editingGuestId);
@@ -326,14 +430,16 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                     <div>
                       <p className="font-bold text-gray-800">{guest.first_name} {guest.last_name}</p>
                       <p className="text-xs text-gray-500">
-                        {guest.document_type} · {guest.document_number || "N/D"}
+                        {(docTypes.find(dt => dt.codice === guest.document_type)?.descrizione || guest.document_type)} · {guest.document_number || "N/D"}
                       </p>
                     </div>
                     <button
                       onClick={() => {
+                        const legacyDocMap: Record<string, string> = { "CARTA IDENTITA": "IDENT", "PASSAPORTO": "PASOR", "PATENTE": "PATEN" };
                         setForm({
                           ...initialForm(),
                           ...guest,
+                          document_type: legacyDocMap[guest.document_type] || guest.document_type || "IDENT",
                           document_front_file: null,
                           document_back_file: null,
                         });
@@ -448,16 +554,20 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                    <input type="text" required value={form.citizenship} onChange={e=>setForm({...form, citizenship: e.target.value})} placeholder="Es. 100000185 (Codice Stato)" className="w-full mt-2 border-2 border-orange-200 p-3 rounded-xl focus:border-orange-500 outline-none bg-orange-50" />
                 )}
              </div>
-             <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Comune di Nascita</label>
-                <input type="text" value={form.birth_city} onChange={e=>setForm({...form, birth_city: e.target.value})} placeholder="Es. Brescia (BS)" className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none" />
-             </div>
+              <div>
+                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Comune di Nascita</label>
+                 {form.birth_country === "100000100" ? (
+                    <ComuneAutocomplete value={form.birth_city} code={form.birth_city_code} onChange={(name, codice) => setForm({...form, birth_city: name, birth_city_code: codice})} />
+                 ) : (
+                    <input type="text" value={form.birth_city} onChange={e=>setForm({...form, birth_city: e.target.value, birth_city_code: ""})} placeholder="Es. Nome località estera" className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none" />
+                 )}
+              </div>
 
              <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Stato di Residenza *</label>
                 <select required value={COMMON_COUNTRIES.find(c => c.code === form.residence_country) ? form.residence_country : "ESTERO_ALTRO"} onChange={e=>{
-                   if(e.target.value === "ESTERO_ALTRO") setForm({...form, residence_country: ""});
-                   else setForm({...form, residence_country: e.target.value});
+                   if(e.target.value === "ESTERO_ALTRO") setForm({...form, residence_country: "", residence_city: "", residence_city_code: ""});
+                   else setForm({...form, residence_country: e.target.value, residence_city: "", residence_city_code: ""});
                 }} className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none bg-white">
                    <option value="" disabled>Seleziona Stato</option>
                    {COMMON_COUNTRIES.map(c => <option key={`res_${c.code}`} value={c.code}>{c.name} ({c.code})</option>)}
@@ -467,10 +577,14 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                    <input type="text" required value={form.residence_country} onChange={e=>setForm({...form, residence_country: e.target.value})} placeholder="Es. 100000185 (Codice Stato)" className="w-full mt-2 border-2 border-orange-200 p-3 rounded-xl focus:border-orange-500 outline-none bg-orange-50" />
                 )}
              </div>
-             <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Comune di Residenza *</label>
-                <input type="text" required value={form.residence_city} onChange={e=>setForm({...form, residence_city: e.target.value})} placeholder="Es. Roma (RM) oppure CAP Estero" className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none" />
-             </div>
+              <div>
+                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Comune di Residenza *</label>
+                 {form.residence_country === "100000100" ? (
+                    <ComuneAutocomplete value={form.residence_city} code={form.residence_city_code} onChange={(name, codice) => setForm({...form, residence_city: name, residence_city_code: codice})} />
+                 ) : (
+                    <input type="text" required value={form.residence_city} onChange={e=>setForm({...form, residence_city: e.target.value, residence_city_code: ""})} placeholder="CAP Estero" className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none" />
+                 )}
+              </div>
 
              {/* SOLO PER CAPOGRUPPO / CAPOFAMIGLIA */}
              <div className="md:col-span-2 pt-4 border-t border-gray-100 mt-2">
@@ -480,14 +594,35 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                    <div>
                       <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Tipo Documento {isLeader && '*'}</label>
                       <select required={isLeader} value={form.document_type} onChange={e=>setForm({...form, document_type: e.target.value})} className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none">
-                         <option value="CARTA IDENTITA">Carta Identità</option>
-                         <option value="PASSAPORTO">Passaporto</option>
-                         <option value="PATENTE">Patente di Guida</option>
+                         <option value="" disabled>Seleziona</option>
+                         {docTypes.map(dt => <option key={dt.codice} value={dt.codice}>{dt.codice} — {dt.descrizione}</option>)}
                       </select>
                    </div>
                    <div>
                       <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Numero Documento {isLeader && '*'}</label>
                       <input type="text" required={isLeader} value={form.document_number} onChange={e=>setForm({...form, document_number: e.target.value})} className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none uppercase" />
+                   </div>
+                   <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Stato di Rilascio {isLeader && '*'}</label>
+                      <select required={isLeader} value={COMMON_COUNTRIES.find(c => c.code === form.document_issue_country) ? form.document_issue_country : "ESTERO_ALTRO"} onChange={e=>{
+                         if(e.target.value === "ESTERO_ALTRO") setForm({...form, document_issue_country: "", document_issue_city: "", document_issue_city_code: ""});
+                         else setForm({...form, document_issue_country: e.target.value, document_issue_city: "", document_issue_city_code: ""});
+                      }} className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none bg-white">
+                         <option value="" disabled>Seleziona Stato</option>
+                         {COMMON_COUNTRIES.map(c => <option key={`drel_${c.code}`} value={c.code}>{c.name} ({c.code})</option>)}
+                         <option value="ESTERO_ALTRO">Altro (Inserimento manuale)</option>
+                      </select>
+                      {(!COMMON_COUNTRIES.find(c => c.code === form.document_issue_country) && form.document_issue_country !== "100000100") && (
+                         <input type="text" required={isLeader} value={form.document_issue_country} onChange={e=>setForm({...form, document_issue_country: e.target.value})} placeholder="Es. 100000185 (Codice Stato)" className="w-full mt-2 border-2 border-orange-200 p-3 rounded-xl focus:border-orange-500 outline-none bg-orange-50" />
+                      )}
+                   </div>
+                   <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Comune di Rilascio {isLeader && '*'}</label>
+                      {form.document_issue_country === "100000100" ? (
+                         <ComuneAutocomplete value={form.document_issue_city} code={form.document_issue_city_code} onChange={(name, codice) => setForm({...form, document_issue_city: name, document_issue_city_code: codice})} />
+                      ) : (
+                         <input type="text" required={isLeader} value={form.document_issue_city} onChange={e=>setForm({...form, document_issue_city: e.target.value, document_issue_city_code: ""})} placeholder="Luogo di rilascio estero" className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-blue-500 outline-none" />
+                      )}
                    </div>
                 </div>
              </div>
