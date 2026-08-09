@@ -29,6 +29,7 @@ export default function PropertyRulesEditor({ property }: { property: any }) {
   const [cancellationPolicy, setCancellationPolicy] = useState(property.cancellation_policy || "Flessibile");
   const [checkInMethod, setCheckInMethod] = useState(property.check_in_method || "Host welcome");
   const [checkInInstructions, setCheckInInstructions] = useState(property.check_in_instructions || "");
+  const [keyLockerCode, setKeyLockerCode] = useState(property.key_locker_code || "");
   const [houseManual, setHouseManual] = useState(property.house_manual || "");
   const [minAdvanceDays, setMinAdvanceDays] = useState(property.min_advance_days ?? 2);
 
@@ -42,6 +43,7 @@ export default function PropertyRulesEditor({ property }: { property: any }) {
          cancellation_policy: cancellationPolicy,
          check_in_method: checkInMethod,
          check_in_instructions: checkInInstructions,
+         key_locker_code: keyLockerCode,
          house_manual: houseManual,
          min_advance_days: minAdvanceDays
       })
@@ -134,6 +136,13 @@ export default function PropertyRulesEditor({ property }: { property: any }) {
               <option value="Smart lock">Smart Lock elettronica (Da remoto)</option>
             </select>
           </div>
+          {checkInMethod === "Self check-in con cassetta di sicurezza" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Codice Cassetta di Sicurezza (Key Locker)</label>
+              <input type="text" className="w-full border rounded p-2 text-gray-900 focus:ring-blue-500" placeholder="Es. 1234 oppure 2468A" value={keyLockerCode} onChange={(e) => setKeyLockerCode(e.target.value)} />
+              <p className="text-xs text-gray-500 mt-1">Verrà mostrato all'ospite nel portale solo dopo il completamento del check-in.</p>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-900 mb-1">Istruzioni (Guida Arrivo)</label>
             <textarea className="w-full border rounded p-2 text-gray-900 min-h-[100px] focus:ring-blue-500" placeholder="Es. Il codice del cancello è 1234. La cassettina si trova sul muro a destra." value={checkInInstructions} onChange={(e) => setCheckInInstructions(e.target.value)} />

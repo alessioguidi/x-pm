@@ -3,7 +3,7 @@
 import { useState, useEffect, use, Suspense } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, Home, CalendarDays, Users, Wifi, LogIn, LogOut, Utensils, Landmark, Phone, MapPin, BookOpen, DoorOpen, ShieldCheck, Hourglass, CreditCard, Lock } from "lucide-react";
+import { Loader2, Home, CalendarDays, Users, Wifi, LogIn, LogOut, Utensils, Landmark, Phone, MapPin, BookOpen, DoorOpen, ShieldCheck, Hourglass, CreditCard, Lock, Key } from "lucide-react";
 import { addDays, parseISO, startOfDay, isAfter, format } from "date-fns";
 
 export default function GuestPortalWrapper({ params }: { params: Promise<{ id: string }> }) {
@@ -257,6 +257,22 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
                 <div>
                   <div className="text-xs text-gray-400 font-semibold uppercase mb-1">Metodo di Check-in</div>
                   <div className="font-medium text-gray-900">{prop.check_in_method}</div>
+                  {prop.check_in_method === "Self check-in con cassetta di sicurezza" && prop?.key_locker_code && (
+                    <div className="mt-2">
+                      {checkInCompleted ? (
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <Key className="w-4 h-4 text-blue-600" /> Codice Cassetta di Sicurezza
+                          </div>
+                          <code className="text-lg font-black tracking-widest bg-white border border-gray-200 rounded px-3 py-1 text-gray-900">{prop.key_locker_code}</code>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 rounded-xl p-3">
+                          <Lock className="w-4 h-4 text-gray-400" /> Codice cassetta disponibile dopo il check-in
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
