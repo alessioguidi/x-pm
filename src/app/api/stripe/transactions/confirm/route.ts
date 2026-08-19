@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { stripe } from "@/utils/stripe/server";
+import { confirmBookingFromDeposit } from "@/utils/confirmBookingDeposit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,6 +50,15 @@ export async function POST(req: NextRequest) {
           .in("id", ids)
           .eq("status", "scheduled");
         if (ctError) console.error("[stripe/transactions/confirm] cash_transactions update failed", ctError);
+
+        // Se tra i movimenti pagati c'è la Caparra, conferma la prenotazione ed invia email
+        const { data: paidTxs } = await supabase
+          .from("cash_transactions")
+          .select("reason")
+          .in("id", ids);
+        if (paidTxs?.some(tx => tx.reason === "Caparra") && pi.metadata.booking_id) {
+          await confirmBookingFromDeposit(pi.metadata.booking_id, req.headers.get("origin") || undefined);
+        }
       }
     }
 
