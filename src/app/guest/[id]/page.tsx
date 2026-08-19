@@ -94,7 +94,7 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
 
   const showCheckIn = booking.status !== 'cancelled';
   const showCheckOut = booking.status !== 'cancelled' && booking.checkout_submitted_at === null;
-  const checkInEnabled = showCheckIn && pendingTotal <= 0;
+  const checkInEnabled = showCheckIn && pendingTotal <= 0 && booking.checkout_submitted_at === null;
   const checkOutEnabled = showCheckOut && pendingTotal <= 0 && checkInCompleted;
 
   const handlePay = async () => {
@@ -223,7 +223,7 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
                 href={checkInEnabled ? `/guest/${booking.id}/checkin` : undefined}
                 onClick={e => { if (!checkInEnabled) e.preventDefault(); }}
                 className={`${checkInEnabled ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'} text-white font-bold py-4 rounded-2xl transition flex items-center justify-center ${checkInEnabled ? 'shadow-lg' : 'opacity-70'}`}
-                title={checkInEnabled ? undefined : pendingTotal > 0 ? "Paga le spese in sospeso per attivare il check-in" : "Prenotazione annullata"}
+                title={checkInEnabled ? undefined : booking.checkout_submitted_at ? "Check-out già inviato" : pendingTotal > 0 ? "Paga le spese in sospeso per attivare il check-in" : "Prenotazione annullata"}
               >
                 {checkInEnabled ? <LogIn className="w-6 h-6 mr-2" /> : <Lock className="w-6 h-6 mr-2" />} Check-in
               </a>
