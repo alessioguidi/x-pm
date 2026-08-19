@@ -131,7 +131,7 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
             Verrai ricontattato per eventuali comunicazioni sulla cauzione.
           </p>
           <button
-            onClick={() => window.close()}
+            onClick={() => { if (history.length > 1) history.back(); else window.location.href = `/guest/${bookingId}`; }}
             className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition"
           >
             Chiudi
