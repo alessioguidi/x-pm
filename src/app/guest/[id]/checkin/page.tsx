@@ -66,8 +66,11 @@ function ComuneAutocomplete({ value, code, onChange }: { value: string; code: st
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    setQuery(value);
-    setDirty(false);
+    if (value !== query) {
+      setQuery(value);
+      setDirty(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   useEffect(() => {
