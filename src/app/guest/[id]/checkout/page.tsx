@@ -18,6 +18,10 @@ export default function CheckoutWrapper({ params }: { params: Promise<{ id: stri
 function CheckoutPage({ bookingId }: { bookingId: string }) {
   const router = useRouter();
   const [booking, setBooking] = useState<any>(null);
+  const [lang, setLang] = useState("it-IT");
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.language) setLang(navigator.language);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [checklist, setChecklist] = useState<{ label: string; done: boolean }[]>([]);
@@ -164,7 +168,7 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
           )}
           <h1 className="text-2xl font-extrabold">Check-out</h1>
           <p className="text-emerald-100 mt-1">
-            {booking.properties?.name} — {new Date(booking.check_out_date).toLocaleDateString("it-IT")}
+            {booking.properties?.name} — {new Date(booking.check_out_date).toLocaleDateString(lang)}
           </p>
         </div>
 

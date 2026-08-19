@@ -4,7 +4,7 @@ import { useState, useEffect, use, Suspense } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { Loader2, Home, CalendarDays, Users, Wifi, LogIn, LogOut, Utensils, Landmark, Phone, MapPin, BookOpen, DoorOpen, ShieldCheck, Hourglass, CreditCard, Lock, Key } from "lucide-react";
-import { addDays, parseISO, startOfDay, isAfter, format } from "date-fns";
+import { addDays, parseISO, startOfDay, isAfter } from "date-fns";
 
 export default function GuestPortalWrapper({ params }: { params: Promise<{ id: string }> }) {
   const p = use(params);
@@ -79,8 +79,12 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
   const usefulNumbers = prop?.useful_numbers || [];
   const guideNotes = prop?.guide_notes || "";
 
-  const fmt = (d: string) => d ? format(parseISO(d), "EEEE d MMMM yyyy") : "—";
-  const fmtShort = (d: string) => d ? format(parseISO(d), "dd/MM/yyyy") : "—";
+  const [lang, setLang] = useState("it-IT");
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.language) setLang(navigator.language);
+  }, []);
+
+  const fmt = (d: string) => d ? new Date(d).toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "—";
 
   const expiresDays = prop?.portal_expires_days ?? 7;
   const expiresAt = booking.check_out_date ? addDays(startOfDay(parseISO(booking.check_out_date)), expiresDays) : null;
@@ -183,8 +187,8 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
                   <div className="text-xs text-gray-400 font-semibold uppercase">Ospiti</div>
                   <div className="font-bold text-gray-900 mt-0.5">
                     {booking.children_count
-                      ? `${booking.adults_count || 0} Adulti • ${booking.children_count} ${booking.children_count === 1 ? "Bambino" : "Bambini"}`
-                      : `${booking.guests_count || 0} Ospiti`}
+                      ? `${booking.adults_count || 0} ${(booking.adults_count || 0) === 1 ? "Adulto" : "Adulti"} • ${booking.children_count} ${booking.children_count === 1 ? "Bambino" : "Bambini"}`
+                      : `${booking.guests_count || 0} ${(booking.guests_count || 0) === 1 ? "Ospite" : "Ospiti"}`}
                   </div>
                 </div>
               </div>
