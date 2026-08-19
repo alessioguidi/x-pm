@@ -365,6 +365,7 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
       setShowNewForm(false);
 
       if (guests && booking?.guests_count && guests.length >= totalGuests) {
+        await supabase.from('bookings').update({ status: 'in_progress' }).eq('id', bookingId);
         setCompleted(true);
       }
     } catch(err: any) {

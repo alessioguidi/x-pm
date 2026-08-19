@@ -48,7 +48,7 @@ export default function BookingWidget({ property }: { property: any }) {
     const fetchAvailability = async () => {
       const [ovrRes, bkRes] = await Promise.all([
         supabase.from('calendar_overrides').select('*').eq('property_id', property.id),
-        supabase.from('bookings').select('check_in_date, check_out_date').eq('property_id', property.id).in('status', ['pending', 'confirmed'])
+        supabase.from('bookings').select('check_in_date, check_out_date').eq('property_id', property.id).in('status', ['pending', 'confirmed', 'in_progress', 'completed'])
       ]);
       if (ovrRes.data) setOverrides(ovrRes.data);
       if (bkRes.data) setActiveBookings(bkRes.data);

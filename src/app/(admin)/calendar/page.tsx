@@ -82,7 +82,7 @@ export default function CalendarGridPage() {
       .gte("date", start)
       .lte("date", end);
 
-    const validStatuses = showDeals ? ['pending', 'confirmed', 'lead_new', 'lead_qualified', 'quote_sent', 'negotiation'] : ['pending', 'confirmed'];
+    const validStatuses = showDeals ? ['pending', 'confirmed', 'in_progress', 'completed', 'lead_new', 'lead_qualified', 'quote_sent', 'negotiation'] : ['pending', 'confirmed', 'in_progress', 'completed'];
 
     const { data: bookingsData } = await supabase
       .from("bookings")

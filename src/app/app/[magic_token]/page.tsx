@@ -63,7 +63,7 @@ export default function StaffTokenApp({ params }: { params: Promise<{ magic_toke
         .from('bookings')
         .select('*, properties(*)')
         .eq('organization_id', prof.organization_id)
-        .in('status', ['pending', 'confirmed'])
+        .in('status', ['pending', 'confirmed', 'in_progress', 'completed'])
         .gte('check_in_date', new Date().toISOString().split('T')[0]);
 
       if (bks) {

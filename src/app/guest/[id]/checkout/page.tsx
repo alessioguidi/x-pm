@@ -23,6 +23,7 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
   const [checklist, setChecklist] = useState<{ label: string; done: boolean }[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
 
@@ -86,6 +87,8 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
           checkout_video_url: urlData.publicUrl,
           checkout_submitted_at: new Date().toISOString(),
           checkout_checklist: checklist,
+          checkout_notes: notes.trim() || null,
+          status: "completed",
         })
         .eq("id", bookingId);
 
@@ -127,7 +130,7 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Check-out Inviato!</h2>
           <p className="text-gray-500 mb-6">
-            Grazie! Il video e la checklist sono stati inviati alla struttura.
+            Grazie! Il video, le note e la checklist sono stati inviati alla struttura.
             Verrai ricontattato per eventuali comunicazioni sulla cauzione.
           </p>
           <button
@@ -231,6 +234,23 @@ function CheckoutPage({ bookingId }: { bookingId: string }) {
               onChange={handleVideoChange}
             />
           </label>
+        </div>
+
+        <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center gap-3 border-b pb-4">
+            <ClipboardList className="w-6 h-6 text-emerald-600" />
+            <h2 className="text-lg font-bold text-gray-900">Note per la struttura</h2>
+          </div>
+          <p className="text-sm text-gray-500">
+            Vuoi comunicarci qualcosa? (es. dettagli sulla casa, orari, problemi) — campo facoltativo.
+          </p>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={4}
+            placeholder="Scrivi qui eventuali note..."
+            className="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-emerald-500 outline-none text-sm"
+          />
         </div>
 
         <button

@@ -78,7 +78,7 @@ export default function BookingsPage() {
     const [bookingsRes, propsRes, contactsRes, channelsRes] = await Promise.all([
       supabase.from('bookings')
         .select('*, properties(name), cash_transactions(amount, status), contacts(*)')
-        .in('status', ['lead_new', 'quote_sent', 'negotiation', 'closed_lost', 'pending', 'confirmed', 'cancelled'])
+        .in('status', ['lead_new', 'quote_sent', 'negotiation', 'closed_lost', 'pending', 'confirmed', 'in_progress', 'completed', 'cancelled'])
         .order('created_at', { ascending: false }),
       supabase.from('properties')
         .select('id, name, organization_id, base_price_per_night, cleaning_fee, pet_fee, city_tax_per_night, city_tax_max_nights, city_tax_child_age, deposit_percentage, security_deposit, max_guests, extra_services, house_rules, default_checkin_staff_id, default_cleaning_staff_id'),
@@ -103,7 +103,7 @@ export default function BookingsPage() {
     setPropData(prop || null);
     if (propId) {
       const [bkRes, ovRes] = await Promise.all([
-        supabase.from('bookings').select('check_in_date, check_out_date').eq('property_id', propId).in('status', ['pending', 'confirmed']),
+        supabase.from('bookings').select('check_in_date, check_out_date').eq('property_id', propId).in('status', ['pending', 'confirmed', 'in_progress', 'completed']),
         supabase.from('calendar_overrides').select('date, is_blocked, closed_to_arrival, closed_to_departure, min_stay',).eq('property_id', propId),
       ]);
       setActiveBookings(bkRes.data || []);
@@ -399,6 +399,8 @@ export default function BookingsPage() {
           'pending':       { label: 'In Attesa',      cls: 'bg-amber-100 text-amber-700 border border-amber-200' },
           'confirmed':     { label: 'Confermata',     cls: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
           'deposit_paid':  { label: 'Caparra Pagata', cls: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
+          'in_progress':   { label: 'In corso',       cls: 'bg-blue-100 text-blue-700 border border-blue-200' },
+          'completed':     { label: 'Terminata',      cls: 'bg-gray-200 text-gray-700 border border-gray-300' },
           'cancelled':     { label: 'Annullata',      cls: 'bg-rose-100 text-rose-700 border border-rose-200' },
         };
         const s = statusMap[row.status] || { label: row.status, cls: 'bg-gray-100 text-gray-700 border border-gray-200' };
@@ -430,9 +432,9 @@ export default function BookingsPage() {
   // Filter bookings by tab
   const todayStr = new Date().toISOString().split('T')[0];
   const propertyFiltered = filterPropertyId ? bookings.filter(b => b.property_id === filterPropertyId) : bookings;
-  const isActiveB = (b: any) => (b.check_in_date >= todayStr || b.check_out_date >= todayStr) && (b.status === 'pending' || b.status === 'confirmed');
+  const isActiveB = (b: any) => (b.check_in_date >= todayStr || b.check_out_date >= todayStr) && (b.status === 'pending' || b.status === 'confirmed' || b.status === 'in_progress');
   const isPendingB = (b: any) => (b.check_in_date >= todayStr || b.check_out_date >= todayStr) && b.status === 'pending';
-  const isClosedB = (b: any) => (b.check_in_date < todayStr && b.check_out_date < todayStr) || b.status === 'cancelled';
+  const isClosedB = (b: any) => (b.check_in_date < todayStr && b.check_out_date < todayStr) || b.status === 'cancelled' || b.status === 'completed';
   const filteredBookings = propertyFiltered.filter(b => {
     if (filterTab === 'all') return true;
     if (filterTab === 'active') return isActiveB(b);

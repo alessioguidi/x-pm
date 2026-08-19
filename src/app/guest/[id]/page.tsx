@@ -135,6 +135,12 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
             {booking.status === 'confirmed' && (
               <span className="bg-emerald-400/20 border border-emerald-300/40 text-emerald-100 text-xs font-bold px-3 py-1 rounded-full">Confermata</span>
             )}
+            {booking.status === 'in_progress' && (
+              <span className="bg-blue-400/20 border border-blue-300/40 text-blue-100 text-xs font-bold px-3 py-1 rounded-full">In corso</span>
+            )}
+            {booking.status === 'completed' && (
+              <span className="bg-gray-400/20 border border-gray-300/40 text-gray-100 text-xs font-bold px-3 py-1 rounded-full">Terminata</span>
+            )}
             {booking.status === 'pending' && (
               <span className="bg-amber-400/20 border border-amber-300/40 text-amber-100 text-xs font-bold px-3 py-1 rounded-full">In Attesa</span>
             )}

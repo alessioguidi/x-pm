@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/utils/supabase/client";
-import { MoveLeft, UserCircle2, Send, Save, CreditCard, Building2, MapPin, Loader2, Phone, Mail, FileText, Download, ShieldCheck, Edit3, Trash2, X } from "lucide-react";
+import { MoveLeft, UserCircle2, Send, Save, CreditCard, Building2, MapPin, Loader2, Phone, Mail, FileText, Download, ShieldCheck, Edit3, Trash2, X, Video, MessageSquare } from "lucide-react";
 import { formatCurrency, formatDateStr, formatDateRange, formatPercent, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -492,6 +492,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 Prenotazione {booking.guest_name}
                 <span className={`ml-4 text-xs font-bold px-3 py-1 rounded-full uppercase ${
                      booking.status === 'confirmed' || booking.status === 'deposit_paid' ? 'bg-emerald-100 text-emerald-700' :
+                     booking.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                     booking.status === 'completed' ? 'bg-gray-200 text-gray-700' :
                      booking.status === 'pending' ? 'bg-amber-100 text-amber-700' :
                      booking.status === 'cancelled' || booking.status === 'closed_lost' ? 'bg-rose-100 text-rose-700' :
                      booking.status === 'lead_new' ? 'bg-gray-100 text-gray-700' :
@@ -503,7 +505,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                      const labels: Record<string, string> = {
                        'lead_new': 'Nuovo Lead', 'quote_sent': 'Preventivo Inviato', 'negotiation': 'Trattativa',
                        'closed_lost': 'Persa', 'pending': 'In Attesa', 'confirmed': 'Confermata',
-                       'deposit_paid': 'Caparra Pagata', 'cancelled': 'Annullata', 'completed': 'Completata',
+                       'deposit_paid': 'Caparra Pagata', 'cancelled': 'Annullata', 'in_progress': 'In corso',
+                       'completed': 'Terminata',
                      };
                      return labels[booking.status] || booking.status;
                    })()}
@@ -522,7 +525,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           </div>
           
            <div className="ml-auto flex items-center gap-2">
-              {booking.status === "confirmed" && (
+              {(booking.status === "confirmed" || booking.status === "in_progress" || booking.status === "deposit_paid") && (
                 <div className="flex flex-wrap gap-1.5 mr-3">
                   <button onClick={() => { const l = `${window.location.origin}/guest/${id}/checkin`; navigator.clipboard.writeText(l); toast.success("Link check-in copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 px-3 py-2 rounded-full hover:bg-blue-100 transition flex items-center">
                     <Send className="w-3 h-3 mr-1" /> Check-in
@@ -565,6 +568,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
              >
                  <option value="pending">Imposta In Attesa</option>
                  <option value="confirmed">Imposta Confermata (+ Invia Email)</option>
+                 <option value="in_progress">Imposta In corso</option>
+                 <option value="completed">Imposta Terminata</option>
                  <option value="cancelled">Annulla Prenotazione (+ Invia Email)</option>
              </select>
           </div>
@@ -691,6 +696,48 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   <button onClick={downloadRossTxt} disabled={bookingGuests.length === 0} className="w-full mt-2 bg-teal-700 hover:bg-teal-800 text-white font-bold py-3 rounded-lg flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed">
                      <Download className="w-4 h-4 mr-2" /> Scarica File Ross1000 TXT (v4)
                   </button>
+              </div>
+
+              {/* Box Check-out Cliente */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 space-y-4">
+                  <h3 className="font-bold flex items-center text-gray-800 border-b border-gray-100 pb-3">
+                     <Video className="w-5 h-5 mr-2 text-purple-500" /> Check-out Cliente
+                  </h3>
+                  {!booking.checkout_submitted_at ? (
+                     <p className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 border border-dashed border-gray-200 text-center">
+                        Check-out online non ancora effettuato dall'ospite.
+                     </p>
+                  ) : (
+                     <div className="space-y-3 text-sm text-gray-600">
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">
+                           Inviato il {formatDateTime(booking.checkout_submitted_at)}
+                        </p>
+                        {booking.checkout_video_url && (
+                           <div>
+                              <video src={booking.checkout_video_url} controls className="w-full rounded-xl border border-gray-200 max-h-64" />
+                              <a href={booking.checkout_video_url} target="_blank" rel="noreferrer" className="text-purple-600 font-bold hover:underline text-xs inline-block mt-2">Apri video a schermo intero</a>
+                           </div>
+                        )}
+                        {booking.checkout_checklist && booking.checkout_checklist.length > 0 && (
+                           <div>
+                              <p className="text-xs font-bold text-gray-500 uppercase mb-1">Checklist</p>
+                              <ul className="space-y-1">
+                                 {booking.checkout_checklist.map((item: any, i: number) => (
+                                    <li key={i} className={`flex items-center gap-2 text-xs ${item.done ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}`}>
+                                       <span>{item.done ? "✓" : "✗"}</span> {item.label}
+                                    </li>
+                                 ))}
+                              </ul>
+                           </div>
+                        )}
+                        {booking.checkout_notes && (
+                           <div className="bg-purple-50 border border-purple-100 rounded-xl p-3">
+                              <p className="text-xs font-bold text-purple-700 uppercase mb-1 flex items-center"><MessageSquare className="w-3.5 h-3.5 mr-1" /> Note dell'ospite</p>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{booking.checkout_notes}</p>
+                           </div>
+                        )}
+                     </div>
+                  )}
               </div>
 
               {/* Box Task Staff */}

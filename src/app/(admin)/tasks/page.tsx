@@ -85,7 +85,7 @@ export default function TasksPage() {
        supabase.from('staff_members').select('id, name, role'),
        supabase.from('properties').select('id, name').order('name'),
        supabase.from('activity_types').select('*').order('created_at'),
-       supabase.from('bookings').select('id, guest_name, status, check_in_date').in('status', ['lead_new', 'quote_sent', 'negotiation', 'pending', 'confirmed'])
+       supabase.from('bookings').select('id, guest_name, status, check_in_date').in('status', ['lead_new', 'quote_sent', 'negotiation', 'pending', 'confirmed', 'in_progress', 'completed'])
     ]);
 
     if (staffRes.data) setStaffMembers(staffRes.data);
@@ -112,7 +112,7 @@ export default function TasksPage() {
 
     const { data: bookings } = await supabase.from('bookings')
       .select('*, properties(id, name, default_checkin_staff_id, default_checkout_staff_id, default_cleaning_staff_id, deposit_method)')
-      .in('status', ['pending', 'confirmed'])
+      .in('status', ['pending', 'confirmed', 'in_progress', 'completed'])
       .or(`check_in_date.gte.${monthStartStr},check_out_date.gte.${monthStartStr}`);
 
     const allTasks: Task[] = [];
@@ -568,7 +568,7 @@ export default function TasksPage() {
                          <option value="">Nessun Collegamento CRM</option>
                          {activeDeals.map(d => (
                              <option key={d.id} value={d.id}>
-                                {d.guest_name} ({['pending', 'confirmed'].includes(d.status) ? 'Prenot.' : 'Trattativa'})
+                                {d.guest_name} ({['pending', 'confirmed', 'in_progress', 'completed'].includes(d.status) ? 'Prenot.' : 'Trattativa'})
                              </option>
                          ))}
                       </select>
