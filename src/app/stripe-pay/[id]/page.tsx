@@ -149,7 +149,7 @@ export default function StripePayPage({ params }: { params: Promise<{ id: string
 
   if (piInfo?.status !== "requires_payment_method") {
     const statusLabels: Record<string, string> = {
-      succeeded: "Completata",
+      succeeded: "Completato",
       canceled: "Annullata",
       processing: "In elaborazione",
     };

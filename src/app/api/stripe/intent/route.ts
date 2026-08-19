@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     if (bookingId) {
       const { data } = await supabase
         .from("bookings")
-        .select("guest_name, check_in_date, check_out_date, properties(name, logo_url)")
+        .select("id, guest_name, check_in_date, check_out_date, properties(name, logo_url)")
         .eq("id", bookingId)
         .single();
       booking = data;

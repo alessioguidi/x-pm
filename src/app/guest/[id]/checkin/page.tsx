@@ -219,9 +219,13 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
         const guestToEdit = registered.find(g => g.id === editId);
         if (guestToEdit) {
           const legacyDocMap: Record<string, string> = { "CARTA IDENTITA": "IDENT", "PASSAPORTO": "PASOR", "PATENTE": "PATEN" };
+          const clean: Record<string, any> = {};
+          for (const [k, v] of Object.entries(guestToEdit)) {
+            clean[k] = v === null ? "" : v;
+          }
           setForm({
             ...initialForm(),
-            ...guestToEdit,
+            ...clean,
             document_type: legacyDocMap[guestToEdit.document_type] || guestToEdit.document_type || "IDELE",
             document_front_file: null,
             document_back_file: null,
@@ -445,10 +449,14 @@ function GuestCheckinPage({ bookingId }: { bookingId: string }) {
                     <button
                       onClick={() => {
           const legacyDocMap: Record<string, string> = { "CARTA IDENTITA": "IDENT", "CARTA IDENTITA' ELETTRONICA": "IDELE", "PASSAPORTO": "PASOR", "PATENTE": "PATEN" };
+          const clean: Record<string, any> = {};
+          for (const [k, v] of Object.entries(guest)) {
+            clean[k] = v === null ? "" : v;
+          }
                         setForm({
                           ...initialForm(),
-                          ...guest,
-                          document_type: legacyDocMap[guest.document_type] || guest.document_type || "IDENT",
+                          ...clean,
+                          document_type: legacyDocMap[guest.document_type] || guest.document_type || "IDELE",
                           document_front_file: null,
                           document_back_file: null,
                         });
