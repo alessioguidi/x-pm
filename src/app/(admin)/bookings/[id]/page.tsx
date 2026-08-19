@@ -483,14 +483,14 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-       <div className="flex items-center gap-4 border-b border-gray-200 pb-4">
+       <div className="flex flex-wrap items-center gap-3 md:flex-nowrap border-b border-gray-200 pb-4">
           <Link href="/bookings" className="p-2.5 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 transition shadow-sm">
              <MoveLeft className="w-5 h-5 text-gray-600" />
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 flex flex-wrap items-center gap-x-3 gap-y-2">
                 Prenotazione {booking.guest_name}
-                <span className={`ml-4 text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
                      booking.status === 'confirmed' || booking.status === 'deposit_paid' ? 'bg-emerald-100 text-emerald-700' :
                      booking.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
                      booking.status === 'completed' ? 'bg-gray-200 text-gray-700' :
@@ -524,14 +524,14 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             </button>
           </div>
           
-           <div className="ml-auto flex items-center gap-2">
+           <div className="ml-auto flex flex-wrap items-center gap-2 w-full md:w-auto">
               <button onClick={() => { const l = `${window.location.origin}/guest/${id}`; navigator.clipboard.writeText(l); toast.success("Link portal ospite copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 px-3 py-2 rounded-full hover:bg-indigo-100 transition flex items-center">
                 <Send className="w-3 h-3 mr-1" /> Portal
               </button>
               <select
                value={booking.status}
                onChange={(e) => handleStatusChange(e.target.value)}
-               className="font-bold text-sm bg-white border border-gray-300 rounded-lg p-2.5 shadow-sm outline-none focus:ring-2 focus:ring-blue-500"
+               className="font-bold text-sm bg-white border border-gray-300 rounded-lg p-2.5 shadow-sm outline-none focus:ring-2 focus:ring-blue-500 flex-1 md:flex-none min-w-0"
              >
                  <option value="pending">Imposta In Attesa</option>
                  <option value="confirmed">Imposta Confermata (+ Invia Email)</option>
