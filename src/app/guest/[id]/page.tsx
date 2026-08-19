@@ -23,6 +23,11 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
   const [pendingPayments, setPendingPayments] = useState<any[]>([]);
   const [registeredGuests, setRegisteredGuests] = useState(0);
   const [paying, setPaying] = useState(false);
+  const [lang, setLang] = useState("it-IT");
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.language) setLang(navigator.language);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -78,11 +83,6 @@ function GuestPortalPage({ bookingId }: { bookingId: string }) {
   const attractions = prop?.guide_attractions || [];
   const usefulNumbers = prop?.useful_numbers || [];
   const guideNotes = prop?.guide_notes || "";
-
-  const [lang, setLang] = useState("it-IT");
-  useEffect(() => {
-    if (typeof navigator !== "undefined" && navigator.language) setLang(navigator.language);
-  }, []);
 
   const fmt = (d: string) => d ? new Date(d).toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "—";
 
