@@ -525,42 +525,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           </div>
           
            <div className="ml-auto flex items-center gap-2">
-              {(booking.status === "confirmed" || booking.status === "in_progress" || booking.status === "deposit_paid") && (
-                <div className="flex flex-wrap gap-1.5 mr-3">
-                  <button onClick={() => { const l = `${window.location.origin}/guest/${id}/checkin`; navigator.clipboard.writeText(l); toast.success("Link check-in copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 px-3 py-2 rounded-full hover:bg-blue-100 transition flex items-center">
-                    <Send className="w-3 h-3 mr-1" /> Check-in
-                  </button>
-                  <button onClick={() => { const l = `${window.location.origin}/guest/${id}/checkout`; navigator.clipboard.writeText(l); toast.success("Link check-out copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-purple-50 text-purple-700 px-3 py-2 rounded-full hover:bg-purple-100 transition flex items-center">
-                    <Send className="w-3 h-3 mr-1" /> Check-out
-                  </button>
-                  <button onClick={() => { const l = `${window.location.origin}/guest/${id}`; navigator.clipboard.writeText(l); toast.success("Link portal ospite copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 px-3 py-2 rounded-full hover:bg-indigo-100 transition flex items-center">
-                    <Send className="w-3 h-3 mr-1" /> Portal
-                  </button>
-                  <button onClick={async () => {
-                    toast.loading("Creazione pre-autorizzazione...", { id: "dep" });
-                    try {
-                      const { error: aErr } = await supabase.auth.getUser();
-                      if (aErr) throw new Error("Login richiesto");
-                      const res = await fetch("/api/stripe/deposit", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` }, body: JSON.stringify({ action: "create", booking_id: id }) });
-                      const data = await res.json();
-                      if (!res.ok) throw new Error(data.error);
-                      const l = `${window.location.origin}/stripe-pay/${data.payment_intent_id}`;
-                      await navigator.clipboard.writeText(l);
-                      toast.success("Link cauzione copiato!", { id: "dep" });
-                    } catch (err: any) { toast.error(err.message, { id: "dep" }); }
-                  }} className="text-[10px] font-bold uppercase tracking-wide bg-emerald-50 text-emerald-700 px-3 py-2 rounded-full hover:bg-emerald-100 transition flex items-center">
-                    <ShieldCheck className="w-3 h-3 mr-1" /> Cauzione
-                  </button>
-                  <button onClick={async () => {
-                    toast.loading("Invio email...", { id: "res" });
-                    const res = await fetch(`/api/bookings/${id}/resend`, { method: "POST" });
-                    if (res.ok) toast.success("Email inviata!", { id: "res" });
-                    else { const d = await res.json().catch(() => ({})); toast.error(d.error || "Errore", { id: "res" }); }
-                  }} className="text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 px-3 py-2 rounded-full hover:bg-blue-100 transition flex items-center">
-                    <Send className="w-3 h-3 mr-1" /> Re-invia
-                  </button>
-                </div>
-              )}
+              <button onClick={() => { const l = `${window.location.origin}/guest/${id}`; navigator.clipboard.writeText(l); toast.success("Link portal ospite copiato!"); }} className="text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 px-3 py-2 rounded-full hover:bg-indigo-100 transition flex items-center">
+                <Send className="w-3 h-3 mr-1" /> Portal
+              </button>
               <select
                value={booking.status}
                onChange={(e) => handleStatusChange(e.target.value)}
@@ -575,10 +542,10 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           </div>
        </div>
 
-       <div className="flex flex-col lg:flex-row gap-6 items-start h-full pb-10">
+       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 items-start pb-10">
           
           {/* LATO SINISTRO: Dettagli e Assegnazioni Staff */}
-          <div className="w-full lg:w-[400px] xl:w-[450px] shrink-0 space-y-6">
+          <div className="w-full space-y-6">
               
               {/* Box Ospite */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 space-y-4 group">
@@ -794,7 +761,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* LATO DESTRO: Sezione CRM / Chat */}
-          <div className="flex-1 w-full bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[calc(100vh-140px)]">
+          <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[520px]">
              <div className="bg-gray-50 border-b border-gray-200 p-4 shrink-0">
                <h3 className="font-bold text-gray-800 flex items-center">
                  <FileText className="w-5 h-5 mr-2 text-gray-500" />
